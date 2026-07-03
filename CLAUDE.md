@@ -27,7 +27,11 @@ and all data stays on the user's computer.
 | File | Purpose |
 |------|---------|
 | `index.html` | Markup + Settings/Setup overlays |
-| `app.js` | All UI logic, state, migrations (~1400 lines) |
+| `state.js` | Constants, persisted state, migrations, library/selected-item accessors and mutations |
+| `checklist.js` | Middle pane: tab bar, category/quick list, custom-request add form |
+| `letter.js` | Right pane: Edit-stack/Structured letter, footer, export text (letterText/letterGroups) |
+| `overlays.js` | Settings overlay, Setup overlay, role picker, top "⋯" menu |
+| `main.js` | Entry point: `el` DOM-ref cache, `render()` orchestrator, init, PDF pane, global shortcuts |
 | `data.js` | Small generic example seed library (18 requests) |
 | `storage.js` | Persistence (server API w/ localStorage fallback) + in-browser DOCX/ZIP |
 | `styles.css` | Styling |
@@ -41,7 +45,7 @@ and all data stays on the user's computer.
   `groups` ⊆ `["ea","editor"]` (who uses it: Assistant Editor or Editor).
   `[bracketed]` tokens in bodies are fill-ins ("needs entry").
   Edited in **Setup** (Director role). "Reporting Summary" is a SECTION,
-  not a tab — `migrateMaster()` in app.js converts old data.
+  not a tab — `migrateMaster()` in state.js converts old data.
 - **Working Layer** (one per master, in `working.layers[masterId]`):
   `preselected[]`, `adaptations{}` + `adaptationTitles{}` (personal rewording
   of system requests — original never lost), `hidden[]`, `tagOverrides{}`,
@@ -72,7 +76,7 @@ and all data stays on the user's computer.
 4. ✅ Adaptation UX: editor shows journal original read-only + Revert inline.
 5. ✅ Letter pane: cards grouped under collapsible section headers, collapsed
    by default except needs-entry.
-6. Split app.js into modules (state/checklist/letter/overlays/main);
+6. ✅ Split app.js into modules (state/checklist/letter/overlays/main);
    extend build.py accordingly.
 
 ## Working on this repo

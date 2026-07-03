@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Build a single, self-contained dist/AIPChecks.html.
 
-Inlines styles.css + data.js + storage.js + app.js into index.html and converts
-the ES modules into one classic <script> so the page runs by double-clicking it
-straight from disk (file://) — no Python, no server, no install. That single
-file is what you send to other people; it works the same on Mac and Windows.
+Inlines styles.css + data.js + storage.js + the app modules (state/checklist/
+letter/overlays/main) into index.html and converts the ES modules into one
+classic <script> so the page runs by double-clicking it straight from disk
+(file://) — no Python, no server, no install. That single file is what you
+send to other people; it works the same on Mac and Windows.
 
 Dev is unchanged: keep editing the separate files and run `python3 server.py`.
 Run this only when you want a fresh distributable:  python3 build.py
@@ -14,6 +15,13 @@ import os, re
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DIST = os.path.join(ROOT, "dist")
 
+# The app is split into these modules (state/checklist/letter/overlays/main),
+# freely cross-importing each other. Unlike data.js/storage.js (below) they
+# are NOT wrapped in an IIFE: they're concatenated straight into one shared
+# scope, same as the single app.js file used to run — import/export are just
+# how they talk to each other in dev.
+APP_MODULES = ["state.js", "checklist.js", "letter.js", "overlays.js", "main.js"]
+
 
 def read(name):
     with open(os.path.join(ROOT, name), encoding="utf-8") as f:
@@ -22,9 +30,9 @@ def read(name):
 
 def strip_module(src):
     """Drop import lines and `export ` keywords so the file runs in a shared scope."""
-    src = re.sub(r'^\s*import .*?;\s*$', "", src, flags=re.M)   # app.js's two imports
+    src = re.sub(r'^\s*import\b[\s\S]*?;\s*\n?', "", src, flags=re.M)   # incl. multi-line `import { a, b } from "./x.js";`
     src = re.sub(r'^\s*export\s+\{[^}]*\};\s*$', "", src, flags=re.M)  # `export { ... };`
-    src = re.sub(r'^export\s+', "", src, flags=re.M)            # `export function/async`
+    src = re.sub(r'^export\s+', "", src, flags=re.M)            # `export function/async/const/let`
     return src
 
 
@@ -32,10 +40,13 @@ def build():
     css = read("styles.css")
     data = strip_module(read("data.js"))
     storage = strip_module(read("storage.js"))
-    app = strip_module(read("app.js"))
+    app = "\n\n".join(
+        f"// === {name} ===\n" + strip_module(read(name)) for name in APP_MODULES
+    )
 
-    # Each source keeps its own scope (avoids name clashes, e.g. `sections` exists
-    # in both data.js and app.js) and exposes only what the next file needs.
+    # data.js/storage.js each keep their own scope (avoids name clashes, e.g.
+    # `sections` exists in both data.js and state.js) and expose only what the
+    # app modules need.
     bundle = (
         "// === data.js ===\n"
         "const __data = (function () {\n" + data +
@@ -45,8 +56,7 @@ def build():
         "// === storage.js ===\n"
         "const store = (function () {\n" + storage +
         "\nreturn { loadStores, save, isOnline, listChecklists, saveChecklist,"
-        " getChecklist, exportDocx, triggerDownload };\n})();\n\n"
-        "// === app.js ===\n" + app
+        " getChecklist, exportDocx, triggerDownload };\n})();\n\n" + app
     )
 
     html = read("index.html")
@@ -55,7 +65,7 @@ def build():
     # Inline CSS and replace the module script with the assembled classic script.
     html = html.replace('<link rel="stylesheet" href="styles.css">',
                         "<style>\n" + css + "\n</style>")
-    html = html.replace('<script type="module" src="app.js"></script>',
+    html = html.replace('<script type="module" src="main.js"></script>',
                         "<script>\n" + bundle + "\n</script>")
 
     os.makedirs(DIST, exist_ok=True)

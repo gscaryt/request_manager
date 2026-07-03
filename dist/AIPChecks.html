@@ -1558,9 +1558,7 @@ function triggerDownload(blob, filename) {
 return { loadStores, save, isOnline, listChecklists, saveChecklist, getChecklist, exportDocx, triggerDownload };
 })();
 
-// === app.js ===
-
-
+// === state.js ===
 // Two layers:
 //   Master Library  — the journal-wide foundation (sections + system requests), edited in Setup.
 //   Working Library — one personal layer per master: preselected, adaptations, hidden, personal requests.
@@ -1590,6 +1588,17 @@ const RS_SECTION = { id: "reporting", label: "Reporting Summary" };
 let sections = [];
 let templates = [];
 
+const $ = (sel) => document.querySelector(sel);
+
+function escapeHtml(v) {
+  return String(v).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+function groupBy(items, getKey) {
+  const groups = new Map();
+  items.forEach((i) => { const k = getKey(i); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
+  return groups;
+}
+
 function defaults() {
   return {
     library: [],   // legacy personal-request store; folded into working on first run
@@ -1606,20 +1615,11 @@ function defaults() {
 }
 
 let state = defaults();
-let mode = "edit";
-let undoStack = [];
-let resetSnapshot = null;             // whole-session snapshot taken on Reset, for "Undo reset"
-let editingSettingId = null;          // settings row currently open for inline text editing
-let editingSetupReqId = null;         // setup system-request row open for inline editing
 let expandedCardId = null;            // Edit-stack card left open; others collapse ("__none__" = all collapsed)
+function setExpandedCard(id) { expandedCardId = id; }
 const collapsedCards = new Set();     // cards the user manually collapsed (override the needs-entry auto-expand)
 const letterSectionOpen = new Map();  // sectionId -> explicit open state, overrides the needs-entry auto-open default
-let checklistView = "sections";       // "sections" (collapsible) | "quick" (flat titles)
-const openSections = new Set();
-const openQuick = new Set();          // quick-list rows showing their description
-
-const $ = (sel) => document.querySelector(sel);
-let el = {};
+let undoStack = [];
 
 // ---- library accessors ----
 function newLayer() {
@@ -1828,7 +1828,7 @@ function addById(id) {
   const e = !t && L().personalRequests.find((x) => x.id === id);
   if (!t && !e) return;
   selected().push(t ? makeSelected(t) : makeSelectedFromLib(e));
-  expandedCardId = selected()[selected().length - 1].id;
+  setExpandedCard(selected()[selected().length - 1].id);
   saveSession();
   render();
   if (mode === "edit") focusCard(selected()[selected().length - 1].id);
@@ -1854,35 +1854,6 @@ function undoRemoval() {
   selected().splice(Math.min(last.index, selected().length), 0, last.item);
   saveSession();
   render();
-}
-
-function addCustom() {
-  const text = el.customText.value.trim();
-  if (!text) return;
-  const tab = state.session.activeTab;
-  const item = {
-    id: crypto.randomUUID(),
-    templateId: null,
-    title: el.customTitle.value.trim() || "Custom request",
-    location: el.customLocation.value,
-    groups: [tab === "custom" ? "ea" : tab],
-    originalBody: null,
-    customText: text,
-    custom: true,
-    savedToLibrary: false,
-    needsCustom: hasBrackets(text),
-    customConfirmed: false,
-    addedAt: Date.now()
-  };
-  if (el.customSaveLib.checked) { saveToLibrary(item); item.savedToLibrary = true; }
-  selected().push(item);
-  expandedCardId = item.id;
-  el.customText.value = "";
-  el.customTitle.value = "";
-  el.customSaveLib.checked = false;
-  saveSession();
-  render();
-  if (mode === "edit") focusCard(item.id);
 }
 
 function saveToLibrary(item) {
@@ -1964,40 +1935,25 @@ function orderCards() {
 
 // ---- roles (UI decluttering, not security) ----
 const isDirector = () => state.settings.role === "director";
-function applyRole() {
-  const r = state.settings.role;
-  el.roleBtn.textContent = "👤 " + (ROLE_LABELS[r] || "Choose role");
-  el.setupBtn.hidden = !isDirector();
-}
-function closeTopMenu() {
-  el.topMenu.hidden = true;
-  el.menuBtn.setAttribute("aria-expanded", "false");
-}
-function openRolePicker() {
-  el.roleCloseBtn.hidden = !state.settings.role;   // first run: a role must be picked
-  el.roleScreen.hidden = false;
-}
-function setRole(role) {
-  if (!ROLE_LABELS[role]) return;
-  state.settings.role = role;
-  saveSettings();
-  state.session.activeTab = ROLE_TAB[role];
-  saveSession();
-  el.roleScreen.hidden = true;
-  if (!isDirector()) el.setupScreen.hidden = true;
-  applyRole();
-  render();
+
+// ---- init: load persisted state, run migrations, apply defaults ----
+async function loadState() {
+  const loaded = await store.loadStores(defaults());
+  state = loaded;
+  if (!state.masterLibraries.length) migrateToLibraries();   // first run: build the foundation from code
+  migrate();
+  saveMasters(); saveWorking(); saveSettings();   // persist whatever migrate() just normalised
+  syncLibrary();
+  if (!selected().length) applyDefaults();
+  return state;
 }
 
-// ---- render ----
-function render() {
-  syncLibrary();
-  renderTabs();
-  renderLocations();
-  renderChecklist();
-  renderLetter();
-  syncLock();
-}
+
+// === checklist.js ===
+// Middle pane: tab bar, category/quick list, custom-request add form.
+const openSections = new Set();
+const openQuick = new Set();          // quick-list rows showing their description
+let checklistView = "sections";       // "sections" (collapsible) | "quick" (flat titles)
 
 // Flagged (selected) count for a tab — "all" is the grand total, others count by membership.
 function tabFlagged(id) {
@@ -2094,6 +2050,92 @@ function renderQuickList(list, query) {
   }
 }
 
+function setChecklistView(next) {
+  checklistView = next;
+  $("#viewSectionsBtn").classList.toggle("active", next === "sections");
+  $("#viewQuickBtn").classList.toggle("active", next === "quick");
+  el.customBox.hidden = next === "quick";   // no custom field in quick view
+  renderChecklist();
+}
+
+function addCustom() {
+  const text = el.customText.value.trim();
+  if (!text) return;
+  const tab = state.session.activeTab;
+  const item = {
+    id: crypto.randomUUID(),
+    templateId: null,
+    title: el.customTitle.value.trim() || "Custom request",
+    location: el.customLocation.value,
+    groups: [tab === "custom" ? "ea" : tab],
+    originalBody: null,
+    customText: text,
+    custom: true,
+    savedToLibrary: false,
+    needsCustom: hasBrackets(text),
+    customConfirmed: false,
+    addedAt: Date.now()
+  };
+  if (el.customSaveLib.checked) { saveToLibrary(item); item.savedToLibrary = true; }
+  selected().push(item);
+  setExpandedCard(item.id);
+  el.customText.value = "";
+  el.customTitle.value = "";
+  el.customSaveLib.checked = false;
+  saveSession();
+  render();
+  if (mode === "edit") focusCard(item.id);
+}
+
+function wireChecklist() {
+  el.tabbar.addEventListener("click", (e) => {
+    const cb = e.target.closest(".tab-active");
+    if (cb) {
+      e.stopPropagation();
+      state.settings.activeChecklists[cb.dataset.tab] = cb.checked;
+      saveSettings();
+      renderChecklist();
+      return;
+    }
+    const tab = e.target.closest(".tab");
+    if (!tab) return;
+    state.session.activeTab = tab.dataset.tab;
+    saveSession();
+    renderTabs();
+    renderChecklist();
+  });
+
+  el.categoryList.addEventListener("change", (e) => {
+    const input = e.target.closest("input[type='checkbox']");
+    if (!input) return;
+    input.checked ? addById(input.dataset.id) : removeSelected(input.dataset.id);
+  });
+  el.categoryList.addEventListener("click", (e) => {
+    const q = e.target.closest(".quick-title");
+    if (!q) return;
+    const body = el.categoryList.querySelector(`.quick-body[data-body="${q.dataset.desc}"]`);
+    if (!body) return;
+    body.hidden = !body.hidden;
+    body.hidden ? openQuick.delete(q.dataset.desc) : openQuick.add(q.dataset.desc);
+  });
+  el.categoryList.addEventListener("toggle", (e) => {
+    const d = e.target.closest("details.category");
+    if (!d) return;
+    d.open ? openSections.add(d.dataset.section) : openSections.delete(d.dataset.section);
+  }, true);
+
+  $("#addCustomBtn").addEventListener("click", addCustom);
+  $("#viewSectionsBtn").addEventListener("click", () => setChecklistView("sections"));
+  $("#viewQuickBtn").addEventListener("click", () => setChecklistView("quick"));
+
+  el.searchInput.addEventListener("input", renderChecklist);
+}
+
+
+// === letter.js ===
+// Right pane: the letter being built (Edit-stack / Preview), its footer, and export text.
+let mode = "edit";
+
 function renderLetter() {
   const heading = state.session.manuscript
     ? `<p class="letter-ms">Manuscript: <strong>${escapeHtml(state.session.manuscript)}</strong></p>` : "";
@@ -2164,14 +2206,194 @@ function renderLetter() {
 function updateFoot() {
   const n = selected().length;
   const preN = selected().filter((i) => L().preselected.includes(i.templateId)).length;
+  const needN = selected().filter((i) => itemNeedsCustom(i) && !i.customConfirmed).length;
   el.footInfo.textContent =
-    (n ? `${preN} preselected, ${n - preN} manually added` : "") +
+    (n ? `${preN} preselected, ${needN} need${needN === 1 ? "s" : ""} entry` : "") +
     (store.isOnline() ? "" : "  ·  offline (no server)");
   el.undoBtn.hidden = undoStack.length === 0;
   el.undoResetBtn.hidden = resetSnapshot === null;
-  const warnN = selected().filter((i) => itemNeedsCustom(i) && !i.customConfirmed).length;
-  el.docxWarn.hidden = warnN === 0;
-  el.docxWarn.title = warnN ? `${warnN} request(s) needing customisation not marked done` : "";
+  el.docxWarn.hidden = needN === 0;
+  el.docxWarn.title = needN ? `${needN} request(s) needing customisation not marked done` : "";
+}
+
+let flashTimer;
+function flash(msg) {
+  el.footInfo.textContent = msg;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(updateFoot, 2500);
+}
+
+function focusCard(id) {
+  if (mode !== "edit") return;
+  const card = el.letterBody.querySelector(`.card[data-id="${id}"]`);
+  if (!card) return;
+  card.classList.add("flash");
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  const ta = card.querySelector("textarea");
+  if (!ta || ta.readOnly) return;
+  ta.focus();
+  const m = /\[[^\]]+\]/.exec(ta.value);
+  if (m) ta.setSelectionRange(m.index, m.index + m[0].length);
+}
+
+function syncLock() {
+  const locked = mode === "preview" ? state.settings.structuredLocked : state.settings.letterLocked;
+  el.lockToggle.checked = locked;
+  el.lockLabel.textContent = (locked ? "🔒" : "🔓") + " Locked";
+  el.orderBtn.hidden = mode !== "edit";
+}
+
+function setMode(next) {
+  mode = next;
+  $("#editModeBtn").classList.toggle("active", next === "edit");
+  $("#previewModeBtn").classList.toggle("active", next === "preview");
+  syncLock();
+  renderLetter();
+}
+
+function letterGroups() {
+  const groups = groupBy(selected(), (i) => i.location);
+  return sections.filter((s) => groups.has(s.id))
+    .map((s) => ({ label: s.label, items: groups.get(s.id).map(displayText) }));
+}
+
+function letterText() {
+  const lines = [];
+  if (state.session.manuscript) lines.push(`Manuscript: ${state.session.manuscript}`, "");
+  lines.push(curIntro(), "");
+  letterGroups().forEach((g, i) => {
+    lines.push(`${i + 1}. ${g.label.toUpperCase()}`);
+    g.items.forEach((t) => lines.push(`- ${t}`));
+    lines.push("");
+  });
+  return lines.join("\n").trimEnd();
+}
+
+// Build the export base name and bump 2,3,... on repeat (no overlap).
+function exportBase() {
+  const base = (state.session.manuscript.trim() ? `${state.session.manuscript.trim()} ` : "") + "Author Checklist";
+  if (state.session.exportName !== base) { state.session.exportName = base; state.session.exportCount = 1; }
+  else state.session.exportCount += 1;
+  const suffix = state.session.exportCount > 1 ? ` ${state.session.exportCount}` : "";
+  saveSession();
+  return base + suffix;
+}
+
+// Guard exports when the Manuscript Number is blank.
+function confirmExport() {
+  if (state.session.manuscript.trim()) return true;
+  return confirm("No Manuscript Number set. Export anyway?");
+}
+
+function wireLetter() {
+  el.letterBody.addEventListener("input", (e) => {
+    const ti = e.target.closest("input[data-title]");
+    if (ti) {
+      const item = selected().find((x) => x.id === ti.dataset.title);
+      if (item) { item.title = ti.value; saveSession(); }
+      return;
+    }
+    const ta = e.target.closest("textarea[data-edit]");
+    if (!ta) return;
+    const item = selected().find((x) => x.id === ta.dataset.edit);
+    if (!item) return;
+    item.customText = ta.value;
+    item.savedToLibrary = false;
+    saveSession();
+    updateFoot();
+  });
+  el.letterBody.addEventListener("click", (e) => {
+    const tg = e.target.closest("button[data-toggle]");
+    if (tg) {
+      const id = tg.dataset.toggle;
+      const item = selected().find((x) => x.id === id);
+      if (item && isCardOpen(item)) {            // collapse
+        collapsedCards.add(id);
+        if (openCardId() === id) setExpandedCard("__none__");
+      } else {                                   // expand
+        collapsedCards.delete(id);
+        setExpandedCard(id);
+      }
+      return renderLetter();
+    }
+    const rm = e.target.closest("button[data-remove]"); if (rm) return removeSelected(rm.dataset.remove);
+    const mv = e.target.closest("button[data-move]"); if (mv) return move(mv.dataset.id, mv.dataset.move === "up" ? -1 : 1);
+    const sv = e.target.closest("button[data-savelib]"); if (sv) return saveSelectedToLibrary(sv.dataset.savelib);
+    const rv = e.target.closest("button[data-revertcard]"); if (rv) return revertCardToOriginal(rv.dataset.revertcard);
+  });
+  el.letterBody.addEventListener("change", (e) => {
+    const cf = e.target.closest("input[data-confirm]");
+    if (!cf) return;
+    const item = selected().find((x) => x.id === cf.dataset.confirm);
+    if (item) { item.customConfirmed = cf.checked; saveSession(); renderLetter(); }
+  });
+  el.letterBody.addEventListener("toggle", (e) => {
+    const d = e.target.closest("details.letter-section");
+    if (!d) return;
+    letterSectionOpen.set(d.dataset.section, d.open);
+  }, true);
+
+  el.lockToggle.addEventListener("change", () => {
+    if (mode === "preview") state.settings.structuredLocked = el.lockToggle.checked;
+    else state.settings.letterLocked = el.lockToggle.checked;
+    saveSettings();
+    renderLetter();
+  });
+  el.undoBtn.addEventListener("click", undoRemoval);
+
+  el.manuscriptInput.addEventListener("input", () => {
+    state.session.manuscript = el.manuscriptInput.value;
+    saveSession();
+    renderLetter();
+  });
+
+  $("#editModeBtn").addEventListener("click", () => setMode("edit"));
+  $("#previewModeBtn").addEventListener("click", () => setMode("preview"));
+  el.orderBtn.addEventListener("click", orderCards);
+
+  // ⚠ on the DOCX button: jump to the first request still needing entry, don't trigger an export.
+  el.docxWarn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const item = selected().find((i) => itemNeedsCustom(i) && !i.customConfirmed);
+    if (!item) return;
+    if (mode !== "edit") setMode("edit");
+    collapsedCards.delete(item.id);
+    setExpandedCard(item.id);
+    renderLetter();
+    focusCard(item.id);
+  });
+}
+
+
+// === overlays.js ===
+// Settings overlay (personal layer) + Setup overlay (Master Libraries) + role picker + top "⋯" menu.
+let editingSettingId = null;          // settings row currently open for inline text editing
+let editingSetupReqId = null;         // setup system-request row open for inline editing
+
+// ---- roles (UI decluttering, not security) ----
+function applyRole() {
+  const r = state.settings.role;
+  el.roleBtn.textContent = "👤 " + (ROLE_LABELS[r] || "Choose role");
+  el.setupBtn.hidden = !isDirector();
+}
+function closeTopMenu() {
+  el.topMenu.hidden = true;
+  el.menuBtn.setAttribute("aria-expanded", "false");
+}
+function openRolePicker() {
+  el.roleCloseBtn.hidden = !state.settings.role;   // first run: a role must be picked
+  el.roleScreen.hidden = false;
+}
+function setRole(role) {
+  if (!ROLE_LABELS[role]) return;
+  state.settings.role = role;
+  saveSettings();
+  state.session.activeTab = ROLE_TAB[role];
+  saveSession();
+  el.roleScreen.hidden = true;
+  if (!isDirector()) el.setupScreen.hidden = true;
+  applyRole();
+  render();
 }
 
 // ---- Settings overlay (personal layer) ----
@@ -2516,205 +2738,7 @@ function deleteRequest(id) {
   afterMasterEdit();
 }
 
-// ---- misc ----
-function focusCard(id) {
-  if (mode !== "edit") return;
-  const card = el.letterBody.querySelector(`.card[data-id="${id}"]`);
-  if (!card) return;
-  card.classList.add("flash");
-  card.scrollIntoView({ behavior: "smooth", block: "center" });
-  const ta = card.querySelector("textarea");
-  if (!ta || ta.readOnly) return;
-  ta.focus();
-  const m = /\[[^\]]+\]/.exec(ta.value);
-  if (m) ta.setSelectionRange(m.index, m.index + m[0].length);
-}
-
-function groupBy(items, getKey) {
-  const groups = new Map();
-  items.forEach((i) => { const k = getKey(i); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
-  return groups;
-}
-
-function letterGroups() {
-  const groups = groupBy(selected(), (i) => i.location);
-  return sections.filter((s) => groups.has(s.id))
-    .map((s) => ({ label: s.label, items: groups.get(s.id).map(displayText) }));
-}
-
-function letterText() {
-  const lines = [];
-  if (state.session.manuscript) lines.push(`Manuscript: ${state.session.manuscript}`, "");
-  lines.push(curIntro(), "");
-  letterGroups().forEach((g, i) => {
-    lines.push(`${i + 1}. ${g.label.toUpperCase()}`);
-    g.items.forEach((t) => lines.push(`- ${t}`));
-    lines.push("");
-  });
-  return lines.join("\n").trimEnd();
-}
-
-// Build the export base name and bump 2,3,... on repeat (no overlap).
-function exportBase() {
-  const base = (state.session.manuscript.trim() ? `${state.session.manuscript.trim()} ` : "") + "Author Checklist";
-  if (state.session.exportName !== base) { state.session.exportName = base; state.session.exportCount = 1; }
-  else state.session.exportCount += 1;
-  const suffix = state.session.exportCount > 1 ? ` ${state.session.exportCount}` : "";
-  saveSession();
-  return base + suffix;
-}
-
-// Guard exports when the Manuscript Number is blank.
-function confirmExport() {
-  if (state.session.manuscript.trim()) return true;
-  return confirm("No Manuscript Number set. Export anyway?");
-}
-
-let flashTimer;
-function flash(msg) {
-  el.footInfo.textContent = msg;
-  clearTimeout(flashTimer);
-  flashTimer = setTimeout(updateFoot, 2500);
-}
-
-function escapeHtml(v) {
-  return String(v).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-}
-
-function setPdfCollapsed(on) {
-  document.querySelector(".workspace").classList.toggle("pdf-collapsed", on);
-  el.pdfExpandBtn.hidden = !on;
-}
-
-function syncLock() {
-  const locked = mode === "preview" ? state.settings.structuredLocked : state.settings.letterLocked;
-  el.lockToggle.checked = locked;
-  el.lockLabel.textContent = (locked ? "🔒" : "🔓") + " Locked";
-  el.orderBtn.hidden = mode !== "edit";
-}
-
-function setChecklistView(next) {
-  checklistView = next;
-  $("#viewSectionsBtn").classList.toggle("active", next === "sections");
-  $("#viewQuickBtn").classList.toggle("active", next === "quick");
-  el.customBox.hidden = next === "quick";   // no custom field in quick view
-  renderChecklist();
-}
-
-function setMode(next) {
-  mode = next;
-  $("#editModeBtn").classList.toggle("active", next === "edit");
-  $("#previewModeBtn").classList.toggle("active", next === "preview");
-  syncLock();
-  renderLetter();
-}
-
-// ---- events ----
-function wire() {
-  el.tabbar.addEventListener("click", (e) => {
-    const cb = e.target.closest(".tab-active");
-    if (cb) {
-      e.stopPropagation();
-      state.settings.activeChecklists[cb.dataset.tab] = cb.checked;
-      saveSettings();
-      renderChecklist();
-      return;
-    }
-    const tab = e.target.closest(".tab");
-    if (!tab) return;
-    state.session.activeTab = tab.dataset.tab;
-    saveSession();
-    renderTabs();
-    renderChecklist();
-  });
-
-  el.categoryList.addEventListener("change", (e) => {
-    const input = e.target.closest("input[type='checkbox']");
-    if (!input) return;
-    input.checked ? addById(input.dataset.id) : removeSelected(input.dataset.id);
-  });
-  el.categoryList.addEventListener("click", (e) => {
-    const q = e.target.closest(".quick-title");
-    if (!q) return;
-    const body = el.categoryList.querySelector(`.quick-body[data-body="${q.dataset.desc}"]`);
-    if (!body) return;
-    body.hidden = !body.hidden;
-    body.hidden ? openQuick.delete(q.dataset.desc) : openQuick.add(q.dataset.desc);
-  });
-  el.categoryList.addEventListener("toggle", (e) => {
-    const d = e.target.closest("details.category");
-    if (!d) return;
-    d.open ? openSections.add(d.dataset.section) : openSections.delete(d.dataset.section);
-  }, true);
-
-  el.letterBody.addEventListener("input", (e) => {
-    const ti = e.target.closest("input[data-title]");
-    if (ti) {
-      const item = selected().find((x) => x.id === ti.dataset.title);
-      if (item) { item.title = ti.value; saveSession(); }
-      return;
-    }
-    const ta = e.target.closest("textarea[data-edit]");
-    if (!ta) return;
-    const item = selected().find((x) => x.id === ta.dataset.edit);
-    if (!item) return;
-    item.customText = ta.value;
-    item.savedToLibrary = false;
-    saveSession();
-    updateFoot();
-  });
-  el.letterBody.addEventListener("click", (e) => {
-    const tg = e.target.closest("button[data-toggle]");
-    if (tg) {
-      const id = tg.dataset.toggle;
-      const item = selected().find((x) => x.id === id);
-      if (item && isCardOpen(item)) {            // collapse
-        collapsedCards.add(id);
-        if (openCardId() === id) expandedCardId = "__none__";
-      } else {                                   // expand
-        collapsedCards.delete(id);
-        expandedCardId = id;
-      }
-      return renderLetter();
-    }
-    const rm = e.target.closest("button[data-remove]"); if (rm) return removeSelected(rm.dataset.remove);
-    const mv = e.target.closest("button[data-move]"); if (mv) return move(mv.dataset.id, mv.dataset.move === "up" ? -1 : 1);
-    const sv = e.target.closest("button[data-savelib]"); if (sv) return saveSelectedToLibrary(sv.dataset.savelib);
-    const rv = e.target.closest("button[data-revertcard]"); if (rv) return revertCardToOriginal(rv.dataset.revertcard);
-  });
-  el.letterBody.addEventListener("change", (e) => {
-    const cf = e.target.closest("input[data-confirm]");
-    if (!cf) return;
-    const item = selected().find((x) => x.id === cf.dataset.confirm);
-    if (item) { item.customConfirmed = cf.checked; saveSession(); renderLetter(); }
-  });
-  el.letterBody.addEventListener("toggle", (e) => {
-    const d = e.target.closest("details.letter-section");
-    if (!d) return;
-    letterSectionOpen.set(d.dataset.section, d.open);
-  }, true);
-
-  el.lockToggle.addEventListener("change", () => {
-    if (mode === "preview") state.settings.structuredLocked = el.lockToggle.checked;
-    else state.settings.letterLocked = el.lockToggle.checked;
-    saveSettings();
-    renderLetter();
-  });
-  el.undoBtn.addEventListener("click", undoRemoval);
-
-  el.manuscriptInput.addEventListener("input", () => {
-    state.session.manuscript = el.manuscriptInput.value;
-    saveSession();
-    renderLetter();
-  });
-
-  $("#addCustomBtn").addEventListener("click", addCustom);
-  $("#viewSectionsBtn").addEventListener("click", () => setChecklistView("sections"));
-  $("#viewQuickBtn").addEventListener("click", () => setChecklistView("quick"));
-  $("#editModeBtn").addEventListener("click", () => setMode("edit"));
-  $("#previewModeBtn").addEventListener("click", () => setMode("preview"));
-  el.orderBtn.addEventListener("click", orderCards);
-
+function wireOverlays() {
   // "⋯" top-bar menu: Setup / Reset / role, closes on outside click, Escape, or picking an item.
   el.menuBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -2733,18 +2757,6 @@ function wire() {
   el.roleScreen.addEventListener("click", (e) => {
     const opt = e.target.closest("button[data-role]");
     if (opt) setRole(opt.dataset.role);
-  });
-
-  // ⚠ on the DOCX button: jump to the first request still needing entry, don't trigger an export.
-  el.docxWarn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const item = selected().find((i) => itemNeedsCustom(i) && !i.customConfirmed);
-    if (!item) return;
-    if (mode !== "edit") setMode("edit");
-    collapsedCards.delete(item.id);
-    expandedCardId = item.id;
-    renderLetter();
-    focusCard(item.id);
   });
 
   // Settings overlay
@@ -2823,6 +2835,33 @@ function wire() {
     const del = e.target.closest("[data-reqdel]"); if (del) return deleteRequest(del.dataset.reqdel);
     if (e.target.closest("[data-addreq]")) return addRequest();
   });
+}
+
+
+// === main.js ===
+// Entry point: shared DOM-ref cache, the top-level render orchestrator, and everything
+// that isn't specific to one pane (PDF viewer, Reset, top-bar export/import, shortcuts).
+let el = {};
+let resetSnapshot = null;      // whole-session snapshot taken on Reset, for "Undo reset"
+
+function render() {
+  syncLibrary();
+  renderTabs();
+  renderLocations();
+  renderChecklist();
+  renderLetter();
+  syncLock();
+}
+
+function setPdfCollapsed(on) {
+  document.querySelector(".workspace").classList.toggle("pdf-collapsed", on);
+  el.pdfExpandBtn.hidden = !on;
+}
+
+function wire() {
+  wireChecklist();
+  wireLetter();
+  wireOverlays();
 
   el.pdfCollapseBtn.addEventListener("click", () => setPdfCollapsed(true));
   el.pdfExpandBtn.addEventListener("click", () => setPdfCollapsed(false));
@@ -2835,8 +2874,8 @@ function wire() {
     state.session.exportName = "";
     state.session.exportCount = 0;
     el.manuscriptInput.value = "";
-    undoStack = [];
-    expandedCardId = null;
+    undoStack.length = 0;
+    setExpandedCard(null);
     collapsedCards.clear();
     letterSectionOpen.clear();
     applyDefaults();
@@ -2899,7 +2938,7 @@ function wire() {
         // must not turn the Editor's UI into an EA one.
         if (loaded.settings) state.settings = { ...loaded.settings, role: state.settings.role };
         migrate();
-        undoStack = [];
+        undoStack.length = 0;
         resetSnapshot = null;
         collapsedCards.clear();
         letterSectionOpen.clear();
@@ -2920,8 +2959,6 @@ function wire() {
     if (!file) return;
     $("#pdfFrame").innerHTML = `<object data="${URL.createObjectURL(file)}" type="application/pdf"></object>`;
   });
-
-  el.searchInput.addEventListener("input", renderChecklist);
 
   // Mouse-first tool, light keyboard help: / search, ↑↓ move between checks, space/enter toggle, esc close.
   document.addEventListener("keydown", (e) => {
@@ -2973,13 +3010,7 @@ async function init() {
     pdfCollapseBtn: $("#pdfCollapseBtn"), pdfExpandBtn: $("#pdfExpandBtn"),
     importInput: $("#importInput")
   };
-  const loaded = await store.loadStores(defaults());
-  state = loaded;
-  if (!state.masterLibraries.length) migrateToLibraries();   // first run: build the foundation from code
-  migrate();
-  saveMasters(); saveWorking(); saveSettings();   // persist whatever migrate() just normalised
-  syncLibrary();
-  if (!selected().length) applyDefaults();
+  await loadState();
   el.manuscriptInput.value = state.session.manuscript || "";
   applyRole();
   wire();
