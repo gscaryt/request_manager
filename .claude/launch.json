@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "aip",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["server.py"],
+      "port": 4173,
+      "autoPort": true
+    },
+    {
+      "name": "static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8099"],
+      "port": 8099,
+      "autoPort": true
+    }
+  ]
+}

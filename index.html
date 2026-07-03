@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Template Request Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <script>
+      // Compatibility shims so the standalone file runs on older browsers too.
+      // structuredClone lands in Chrome/Edge 98 & Safari 15.4 (2022); crypto.randomUUID in Chrome 92.
+      // The app uses these during first-run setup, so without them init() throws before any button
+      // is wired — the page renders but nothing clicks. The data cloned here is plain JSON, so a
+      // JSON round-trip is a faithful structuredClone; the IDs don't need cryptographic strength.
+      if (typeof structuredClone !== "function") {
+        window.structuredClone = function (x) { return JSON.parse(JSON.stringify(x)); };
+      }
+      try { if (!window.crypto) window.crypto = {}; } catch (e) {}
+      if (window.crypto && typeof crypto.randomUUID !== "function") {
+        try {
+          crypto.randomUUID = function () {
+            return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+              var r = (Math.random() * 16) | 0, v = c === "x" ? r : (r & 0x3) | 0x8;
+              return v.toString(16);
+            });
+          };
+        } catch (e) {}
+      }
+    </script>
+    <script>
+      // Classic (non-module) so it runs even when modules are CORS-blocked on file://.
+      if (location.protocol === "file:") {
+        document.documentElement.innerHTML =
+          '<body style="font:16px system-ui;padding:3rem;max-width:40rem;margin:auto">' +
+          "<h1>Open Template Request Manager through the server</h1>" +
+          "<p>Don't open <code>index.html</code> directly — it can't run this way. " +
+          "Double-click <b>run.command</b> (or run <code>python3 server.py</code>), then open " +
+          '<a href="http://localhost:4173">http://localhost:4173</a>.</p></body>';
+      }
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Template Request Manager</h1>
+        <p>Flag only problems. Edit requests. Build the author letter.</p>
+      </div>
+      <div class="top-actions">
+        <input id="manuscriptInput" type="text" placeholder="Manuscript no. (e.g. ABCD-25-12345A)">
+        <button id="copyBtn" type="button" title="Copy the letter text to the clipboard">Copy letter</button>
+        <button id="exportBtn" type="button" title="Save your in-progress work as a .json file to resume later (also kept in /archive)">Save working file</button>
+        <label class="file-btn" title="Reopen a saved working file and continue where you left off">
+          <input id="importInput" type="file" accept="application/json" hidden>
+          Open working file
+        </label>
+        <button id="docxBtn" type="button" title="Export the letter as a Word .docx (table per section)">Export DOCX <span id="docxWarn" class="docx-warn" hidden title="Some requests needing customisation are not marked done">⚠</span></button>
+        <button id="setupBtn" type="button" title="Library Setup — build the shared foundation (system requests)">Setup</button>
+        <button id="settingsBtn" type="button" title="Your personal layer — preselected, tags, adaptations">Settings</button>
+        <button id="devBtn" type="button" title="Soft developer lock">🔒 Dev</button>
+        <button id="seedBtn" type="button" title="Reset selected requests to defaults">Reset</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane pdf-pane" aria-label="PDF viewer">
+        <button id="pdfExpandBtn" class="pdf-expand" type="button" title="Show PDF panel" hidden>⟩ PDF</button>
+        <div class="pane-head">
+          <h2>Manuscript</h2>
+          <div class="head-right">
+            <label class="file-btn">
+              <input id="pdfInput" type="file" accept="application/pdf">
+              Load PDF
+            </label>
+            <button id="pdfCollapseBtn" type="button" title="Collapse PDF panel">⟨</button>
+          </div>
+        </div>
+        <div class="pdf-frame" id="pdfFrame">
+          <div class="pdf-empty">
+            <strong>No PDF loaded</strong>
+            <span>Click “Load PDF” to preview the manuscript here.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="pane check-pane" aria-label="Issue picker">
+        <div class="tabbar" id="tabbar"></div>
+        <div class="pane-head">
+          <input id="searchInput" type="search" placeholder="Search checks">
+          <div class="segmented view-toggle" role="tablist" aria-label="Checklist view">
+            <button id="viewSectionsBtn" class="active" type="button" title="Collapsible sections with descriptions">Sections</button>
+            <button id="viewQuickBtn" type="button" title="Flat quick list — titles only, click a title for its text">Quick list</button>
+          </div>
+        </div>
+
+        <details class="custom-box" id="customBox" aria-label="Custom request">
+          <summary class="custom-title">
+            <strong>Custom request</strong>
+            <span>One-off, tagged (Custom)</span>
+          </summary>
+          <input id="customTitle" type="text" placeholder="Title (optional) — “(Custom)” is added automatically">
+          <textarea id="customText" rows="3" placeholder="Write request text. Line breaks are kept."></textarea>
+          <div class="custom-row">
+            <select id="customLocation" aria-label="Structured location"></select>
+            <label class="inline-check"><input id="customSaveLib" type="checkbox"> Save to library</label>
+            <button id="addCustomBtn" type="button">Add</button>
+          </div>
+        </details>
+
+        <div id="categoryList" class="category-list"></div>
+      </section>
+
+      <section class="pane letter-pane" aria-label="Feedback builder">
+        <div class="pane-head">
+          <h2>Letter</h2>
+          <div class="head-right">
+            <button id="orderBtn" class="icon-btn" type="button" title="Order — sort cards into the standard section order" aria-label="Sort cards into section order">⇅</button>
+            <div class="segmented" role="tablist" aria-label="Letter mode">
+              <button id="editModeBtn" class="active" type="button">Edit stack</button>
+              <button id="previewModeBtn" type="button">Structured</button>
+            </div>
+            <label class="inline-check lock"><input id="lockToggle" type="checkbox"> <span id="lockLabel">🔒 Locked</span></label>
+          </div>
+        </div>
+        <div id="letterBody" class="letter-body"></div>
+        <div class="letter-foot">
+          <span id="footInfo"></span>
+          <button id="undoResetBtn" type="button" hidden>Undo reset</button>
+          <button id="undoBtn" type="button" hidden>Undo Removal</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Settings overlay -->
+    <div id="settingsScreen" class="overlay" hidden>
+      <div class="overlay-card">
+        <div class="overlay-head">
+          <h2>Settings — your working library</h2>
+          <div class="overlay-head-actions">
+            <button id="settingsDevBtn" type="button" title="Soft developer lock">🔒 Dev</button>
+            <button id="settingsCloseBtn" type="button">Close</button>
+          </div>
+        </div>
+        <p class="muted">This is <b>your</b> layer on top of the active library. Tick <b>preselected</b> to start a request selected on every reset. Tag <b>EA · Editor</b> to choose which checklist tabs show it. Click a request’s name to <b>adapt</b> its title and text for your field (system text can always be restored); use <b>×</b> to hide it. Your own one-off additions are <b>custom requests</b>. To change the shared foundation itself, use <b>Setup</b>.</p>
+        <p id="settingsLockNote" class="lock-note">🔒 Read-only. Unlock Dev mode (top bar) to change your preselected set or adapt request text.</p>
+        <div class="settings-group intro-group">
+          <h4>Letter introduction</h4>
+          <div class="intro-head">
+            <p class="muted">Your override of this library’s intro. Shown atop the letter, the Structured view and the DOCX.</p>
+            <button id="introRevertBtn" type="button" title="Drops your override and falls back to the library’s intro">Revert to library intro</button>
+          </div>
+          <textarea id="introText" rows="4"></textarea>
+        </div>
+        <div id="settingsList" class="settings-list"></div>
+      </div>
+    </div>
+
+    <!-- Setup overlay — the shared foundation (Master Libraries) -->
+    <div id="setupScreen" class="overlay" hidden>
+      <div class="overlay-card">
+        <div class="overlay-head">
+          <h2>Library Setup — the shared foundation</h2>
+          <div class="overlay-head-actions">
+            <button id="setupDevBtn" type="button" title="Soft developer lock">🔒 Dev</button>
+            <button id="setupCloseBtn" type="button">Close</button>
+          </div>
+        </div>
+        <p class="muted">Build the journal-wide standard a chief editor hands to every editor: pick a <b>Master Library</b>, set its sections, and write its <b>system requests</b>. These are not personal customisations — for those, use <b>Settings</b>. Start a new library from 0 to stay journal-agnostic.</p>
+        <p id="setupLockNote" class="lock-note">🔒 Read-only. Unlock Dev mode (top bar) to author libraries.</p>
+
+        <div class="settings-group">
+          <h4>Master Libraries</h4>
+          <p class="muted">Share a library as a single <code>.json</code> file: <b>Export</b> sends the active library (and your personal layer) to another editor; <b>Import</b> loads one without touching your current work.</p>
+          <div class="setup-lib-share">
+            <button id="exportLibBtn" type="button" title="Save the active library as a .json file to send to other editors">Export library file</button>
+            <label class="file-btn" title="Load a library .json file into your libraries (your current work is kept)">
+              <input id="importLibInput" type="file" accept="application/json" hidden>
+              Import library file
+            </label>
+          </div>
+          <div id="setupLibs" class="setup-libs"></div>
+        </div>
+
+        <div class="settings-group intro-group">
+          <h4>Library intro (default letter opening)</h4>
+          <p class="muted">Shipped with this library; an editor can override it in their own layer (Settings).</p>
+          <textarea id="setupIntro" rows="4"></textarea>
+        </div>
+
+        <div class="settings-group">
+          <h4>Sections</h4>
+          <div id="setupSections"></div>
+        </div>
+
+        <div id="setupRequests" class="settings-list"></div>
+      </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

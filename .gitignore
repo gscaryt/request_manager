@@ -1,0 +1,4 @@
+.DS_Store
+# Runtime data — personal libraries, sessions, exports. Never publish.
+archive/
+.claude/settings.local.json

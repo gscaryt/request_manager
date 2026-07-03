@@ -1,0 +1,2864 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Template Request Manager</title>
+    <style>
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --ink: #1d232f;
+  --muted: #667085;
+  --line: #d9dee7;
+  --blue: #2764d8;
+  --green: #14845c;
+  --red: #c63d35;
+  --amber: #a65f00;
+  --soft-blue: #e9f0ff;
+  --soft-green: #e8f6ef;
+  --soft-amber: #fff4df;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--blue);
+}
+
+.topbar {
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 22px;
+}
+
+h2 {
+  font-size: 15px;
+}
+
+.topbar p,
+.custom-title span,
+.meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#manuscriptInput {
+  width: 260px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 9px;
+}
+
+#copyBtn {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+
+.letter-ms {
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.card.flash {
+  animation: flash 1.2s ease-out;
+}
+
+@keyframes flash {
+  from { box-shadow: 0 0 0 3px var(--soft-blue); }
+  to { box-shadow: 0 0 0 0 transparent; }
+}
+
+.workspace {
+  height: calc(100vh - 76px);
+  display: grid;
+  grid-template-columns: minmax(320px, 34%) minmax(360px, 32%) minmax(360px, 34%);
+  gap: 1px;
+  background: var(--line);
+}
+
+.pane {
+  min-width: 0;
+  min-height: 0;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;   /* each pane scrolls in its own inner region, not the page */
+}
+
+/* PDF panel collapse */
+.workspace.pdf-collapsed {
+  grid-template-columns: 46px minmax(360px, 1fr) minmax(360px, 1fr);
+}
+.pdf-collapsed .pdf-pane > .pane-head,
+.pdf-collapsed .pdf-pane > .pdf-frame {
+  display: none;
+}
+.pdf-expand {
+  display: none;
+}
+.pdf-collapsed .pdf-expand {
+  display: block;
+  writing-mode: vertical-rl;
+  margin: 10px auto;
+  padding: 12px 8px;
+  white-space: nowrap;
+}
+#pdfCollapseBtn {
+  padding: 6px 9px;
+}
+
+.pane-head {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pane-head input[type="search"] {
+  width: 170px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 9px;
+}
+
+.file-btn {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  background: #fff;
+}
+
+.file-btn input {
+  display: none;
+}
+
+.pdf-frame {
+  flex: 1;
+  margin: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #eef1f5;
+}
+
+.pdf-frame object {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.pdf-empty {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.custom-box {
+  margin: 12px;
+  padding: 12px;
+  border: 2px solid var(--blue);
+  border-radius: 8px;
+  background: var(--soft-blue);
+}
+
+.custom-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.custom-box textarea,
+.card textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px;
+  background: #fff;
+}
+
+#customTitle {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 9px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+
+.custom-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.custom-row select {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  background: #fff;
+}
+
+#addCustomBtn {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+
+.category-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 12px 12px;
+}
+
+.category {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.category summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  cursor: pointer;
+  background: #fafbfc;
+  font-weight: 700;
+}
+
+.category summary::-webkit-details-marker {
+  display: none;
+}
+
+.count {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.count .flagged {
+  color: var(--red);
+}
+
+.issue {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 9px;
+  padding: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.issue input {
+  margin-top: 2px;
+}
+
+.issue-title {
+  display: block;
+  font-size: 14px;
+}
+
+.issue-template {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.letter-body {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segmented button {
+  border: 0;
+  border-radius: 0;
+  padding: 7px 9px;
+}
+
+.segmented .active {
+  background: var(--ink);
+  color: #fff;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--green);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.card.custom {
+  border-left-color: var(--amber);
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.card-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.remove-btn {
+  color: var(--red);
+  padding: 4px 7px;
+}
+
+.preview-doc {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+  line-height: 1.45;
+}
+
+.preview-section {
+  margin-bottom: 18px;
+}
+
+.preview-section h3 {
+  font-size: 14px;
+  margin: 0 0 8px;
+  color: var(--blue);
+}
+
+.empty-state {
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  background: #fafbfc;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+}
+
+@media (max-width: 1050px) {
+  .workspace {
+    height: auto;
+    min-height: calc(100vh - 76px);
+    grid-template-columns: 1fr;
+  }
+
+  .pane {
+    min-height: 520px;
+  }
+}
+
+/* --- v3 additions --- */
+.tabbar {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px 6px 0 0;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  background: #fafbfc;
+  font-size: 13px;
+}
+.tab.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+.tab.active .tab-active { accent-color: #fff; }
+.tab-active { margin: 0; }
+
+.head-right { display: flex; align-items: center; gap: 10px; }
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.inline-check.lock { font-size: 13px; color: var(--ink); }
+
+.letter-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  min-height: 44px;
+}
+#footInfo { color: var(--muted); font-size: 12px; }
+#undoBtn { color: var(--blue); }
+
+.card-actions { display: flex; align-items: center; gap: 6px; }
+.ghost-btn { padding: 4px 7px; font-size: 12px; color: var(--blue); }
+.origtoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--soft-amber);
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.tag.warn { background: var(--soft-amber); color: var(--red); }
+.card.needs-entry { border-left-color: var(--red); }
+
+.icon-btn { font-size: 15px; line-height: 1; padding: 4px 6px; }
+.tab-flagged {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  vertical-align: middle;
+}
+.tab.active .tab-flagged { background: #fff; color: var(--ink); }
+.overlay-head-actions { display: flex; align-items: center; gap: 8px; }
+#orderBtn { font-size: 17px; padding: 3px 7px; }
+
+.preview-list { margin: 0; padding-left: 20px; }
+.preview-list li { margin-bottom: 8px; }
+.li-text { white-space: pre-wrap; }
+.li-actions { margin-left: 6px; white-space: nowrap; }
+.li-actions button {
+  padding: 1px 6px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.overlay[hidden] { display: none; } /* author display:grid otherwise beats the hidden attr */
+#devBtn.on { border-color: var(--green); color: var(--green); }
+.lock-note {
+  color: var(--amber);
+  background: var(--soft-amber);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 10;
+}
+.overlay-card {
+  background: #fff;
+  border-radius: 10px;
+  width: min(720px, 100%);
+  max-height: 86vh;
+  overflow: auto;
+  padding: 18px;
+}
+.overlay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.muted { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+.settings-group { margin-bottom: 14px; }
+.settings-group h4 { margin: 0 0 6px; font-size: 13px; color: var(--blue); }
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.settings-default { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; color: var(--muted); }
+.settings-name { flex: 1 1 auto; min-width: 0; }
+.settings-tags { flex: 0 0 auto; display: inline-flex; gap: 10px; }
+.tag-check { display: inline-flex; align-items: center; gap: 3px; color: var(--ink); white-space: nowrap; }
+
+/* customText keeps line breaks visually while typing */
+.custom-box textarea, .card textarea { white-space: pre-wrap; }
+
+.preview-intro { margin-bottom: 14px; }
+
+/* Settings rows: clickable name, delete, inline editing, intro editor */
+.settings-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+}
+button.settings-name:hover { background: var(--soft-blue); border-color: transparent; }
+.settings-del {
+  flex: 0 0 auto;
+  color: var(--red);
+  padding: 2px 8px;
+  line-height: 1;
+}
+.settings-row.editing { flex-direction: column; align-items: stretch; gap: 6px; }
+.settings-edit {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--blue);
+  border-radius: 6px;
+  padding: 8px;
+  white-space: pre-wrap;
+}
+.settings-edit-actions { display: flex; gap: 6px; }
+.settings-edit-actions button { padding: 5px 9px; font-size: 12px; }
+.struck { text-decoration: line-through; color: var(--muted); }
+.custom-flag { background: var(--soft-green); color: var(--green); }
+.intro-group textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  white-space: pre-wrap;
+}
+
+/* Setup overlay (Master Libraries) */
+.setup-lib-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.setup-lib-row.active { background: var(--soft-blue); }
+.setup-lib-row label { flex: 1 1 auto; min-width: 0; }
+.setup-lib-row .muted { flex: 0 0 auto; }
+.setup-lib-actions { flex: 0 0 auto; display: inline-flex; gap: 6px; }
+.setup-lib-actions button { padding: 3px 8px; font-size: 12px; }
+.setup-section-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+.setup-section-row input[type="text"] { flex: 1 1 auto; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; }
+.setup-section-row button { padding: 3px 8px; line-height: 1; }
+.setup-lib-share { display: flex; gap: 8px; margin: 4px 0 10px; flex-wrap: wrap; }
+.setup-add { display: flex; gap: 6px; margin-top: 8px; }
+.setup-add input { flex: 1 1 auto; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; }
+.setup-newreq input, .setup-newreq textarea {
+  width: 100%; margin-bottom: 6px; padding: 6px 8px;
+  border: 1px solid var(--line); border-radius: 6px; white-space: pre-wrap;
+}
+.setup-req-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.setup-req-meta select { padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; }
+.intro-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.intro-head .muted { margin-bottom: 0; }
+.intro-head button { padding: 5px 9px; font-size: 12px; flex: 0 0 auto; }
+.settings-edit-title {
+  width: 100%;
+  border: 1px solid var(--blue);
+  border-radius: 6px;
+  padding: 7px 8px;
+  font-weight: 700;
+}
+
+/* Custom request box as a collapsible details */
+.custom-box > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.custom-box > summary::-webkit-details-marker { display: none; }
+.custom-box > summary::before { content: "▸ "; color: var(--blue); font-weight: 700; }
+.custom-box[open] > summary::before { content: "▾ "; }
+.custom-box[open] > summary { margin-bottom: 8px; }
+.custom-box > :not(summary) { margin-top: 8px; }
+.custom-box > input:first-of-type { margin-top: 8px; }
+
+/* Checklist view toggle (Sections / Quick list) */
+.view-toggle button { font-size: 12px; padding: 6px 9px; }
+
+/* Quick list view */
+.quick-group { margin-bottom: 10px; }
+.quick-head {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--blue);
+  padding: 6px 4px 4px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+}
+.quick-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  border-bottom: 1px solid #eef1f5;
+}
+.quick-row.sel { background: var(--soft-green); }
+.quick-title {
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 3px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  min-width: 0;
+}
+.quick-title:hover { background: var(--soft-blue); border-color: transparent; }
+.quick-body {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: pre-wrap;
+  padding: 2px 4px 6px 26px;
+}
+
+/* Edit-stack card: collapse + editable title + customised confirm */
+.card-toggle {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  align-self: start;
+  line-height: 1.6;
+}
+.card-toggle:hover { border-color: transparent; color: var(--blue); }
+.card-headmain { flex: 1 1 auto; min-width: 0; }
+.card-titlerow { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.card-title-input {
+  flex: 1 1 auto;
+  min-width: 120px;
+  font-weight: 700;
+  font-size: 14px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 4px;
+  background: transparent;
+}
+.card-title-input:hover { border-color: var(--line); }
+.card-title-input:focus { border-color: var(--blue); background: #fff; outline: none; }
+.card.collapsed > textarea { display: none; }
+.card.collapsed { padding-bottom: 8px; }
+.custom-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--amber);
+  white-space: nowrap;
+}
+.custom-confirm.done { color: var(--green); }
+.docx-warn { color: var(--amber); font-weight: 700; }
+
+</style>
+    <script>
+      // Compatibility shims so the standalone file runs on older browsers too.
+      // structuredClone lands in Chrome/Edge 98 & Safari 15.4 (2022); crypto.randomUUID in Chrome 92.
+      // The app uses these during first-run setup, so without them init() throws before any button
+      // is wired — the page renders but nothing clicks. The data cloned here is plain JSON, so a
+      // JSON round-trip is a faithful structuredClone; the IDs don't need cryptographic strength.
+      if (typeof structuredClone !== "function") {
+        window.structuredClone = function (x) { return JSON.parse(JSON.stringify(x)); };
+      }
+      try { if (!window.crypto) window.crypto = {}; } catch (e) {}
+      if (window.crypto && typeof crypto.randomUUID !== "function") {
+        try {
+          crypto.randomUUID = function () {
+            return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+              var r = (Math.random() * 16) | 0, v = c === "x" ? r : (r & 0x3) | 0x8;
+              return v.toString(16);
+            });
+          };
+        } catch (e) {}
+      }
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Template Request Manager</h1>
+        <p>Flag only problems. Edit requests. Build the author letter.</p>
+      </div>
+      <div class="top-actions">
+        <input id="manuscriptInput" type="text" placeholder="Manuscript no. (e.g. ABCD-25-12345A)">
+        <button id="copyBtn" type="button" title="Copy the letter text to the clipboard">Copy letter</button>
+        <button id="exportBtn" type="button" title="Save your in-progress work as a .json file to resume later (also kept in /archive)">Save working file</button>
+        <label class="file-btn" title="Reopen a saved working file and continue where you left off">
+          <input id="importInput" type="file" accept="application/json" hidden>
+          Open working file
+        </label>
+        <button id="docxBtn" type="button" title="Export the letter as a Word .docx (table per section)">Export DOCX <span id="docxWarn" class="docx-warn" hidden title="Some requests needing customisation are not marked done">⚠</span></button>
+        <button id="setupBtn" type="button" title="Library Setup — build the shared foundation (system requests)">Setup</button>
+        <button id="settingsBtn" type="button" title="Your personal layer — preselected, tags, adaptations">Settings</button>
+        <button id="devBtn" type="button" title="Soft developer lock">🔒 Dev</button>
+        <button id="seedBtn" type="button" title="Reset selected requests to defaults">Reset</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="pane pdf-pane" aria-label="PDF viewer">
+        <button id="pdfExpandBtn" class="pdf-expand" type="button" title="Show PDF panel" hidden>⟩ PDF</button>
+        <div class="pane-head">
+          <h2>Manuscript</h2>
+          <div class="head-right">
+            <label class="file-btn">
+              <input id="pdfInput" type="file" accept="application/pdf">
+              Load PDF
+            </label>
+            <button id="pdfCollapseBtn" type="button" title="Collapse PDF panel">⟨</button>
+          </div>
+        </div>
+        <div class="pdf-frame" id="pdfFrame">
+          <div class="pdf-empty">
+            <strong>No PDF loaded</strong>
+            <span>Click “Load PDF” to preview the manuscript here.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="pane check-pane" aria-label="Issue picker">
+        <div class="tabbar" id="tabbar"></div>
+        <div class="pane-head">
+          <input id="searchInput" type="search" placeholder="Search checks">
+          <div class="segmented view-toggle" role="tablist" aria-label="Checklist view">
+            <button id="viewSectionsBtn" class="active" type="button" title="Collapsible sections with descriptions">Sections</button>
+            <button id="viewQuickBtn" type="button" title="Flat quick list — titles only, click a title for its text">Quick list</button>
+          </div>
+        </div>
+
+        <details class="custom-box" id="customBox" aria-label="Custom request">
+          <summary class="custom-title">
+            <strong>Custom request</strong>
+            <span>One-off, tagged (Custom)</span>
+          </summary>
+          <input id="customTitle" type="text" placeholder="Title (optional) — “(Custom)” is added automatically">
+          <textarea id="customText" rows="3" placeholder="Write request text. Line breaks are kept."></textarea>
+          <div class="custom-row">
+            <select id="customLocation" aria-label="Structured location"></select>
+            <label class="inline-check"><input id="customSaveLib" type="checkbox"> Save to library</label>
+            <button id="addCustomBtn" type="button">Add</button>
+          </div>
+        </details>
+
+        <div id="categoryList" class="category-list"></div>
+      </section>
+
+      <section class="pane letter-pane" aria-label="Feedback builder">
+        <div class="pane-head">
+          <h2>Letter</h2>
+          <div class="head-right">
+            <button id="orderBtn" class="icon-btn" type="button" title="Order — sort cards into the standard section order" aria-label="Sort cards into section order">⇅</button>
+            <div class="segmented" role="tablist" aria-label="Letter mode">
+              <button id="editModeBtn" class="active" type="button">Edit stack</button>
+              <button id="previewModeBtn" type="button">Structured</button>
+            </div>
+            <label class="inline-check lock"><input id="lockToggle" type="checkbox"> <span id="lockLabel">🔒 Locked</span></label>
+          </div>
+        </div>
+        <div id="letterBody" class="letter-body"></div>
+        <div class="letter-foot">
+          <span id="footInfo"></span>
+          <button id="undoResetBtn" type="button" hidden>Undo reset</button>
+          <button id="undoBtn" type="button" hidden>Undo Removal</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Settings overlay -->
+    <div id="settingsScreen" class="overlay" hidden>
+      <div class="overlay-card">
+        <div class="overlay-head">
+          <h2>Settings — your working library</h2>
+          <div class="overlay-head-actions">
+            <button id="settingsDevBtn" type="button" title="Soft developer lock">🔒 Dev</button>
+            <button id="settingsCloseBtn" type="button">Close</button>
+          </div>
+        </div>
+        <p class="muted">This is <b>your</b> layer on top of the active library. Tick <b>preselected</b> to start a request selected on every reset. Tag <b>EA · Editor</b> to choose which checklist tabs show it. Click a request’s name to <b>adapt</b> its title and text for your field (system text can always be restored); use <b>×</b> to hide it. Your own one-off additions are <b>custom requests</b>. To change the shared foundation itself, use <b>Setup</b>.</p>
+        <p id="settingsLockNote" class="lock-note">🔒 Read-only. Unlock Dev mode (top bar) to change your preselected set or adapt request text.</p>
+        <div class="settings-group intro-group">
+          <h4>Letter introduction</h4>
+          <div class="intro-head">
+            <p class="muted">Your override of this library’s intro. Shown atop the letter, the Structured view and the DOCX.</p>
+            <button id="introRevertBtn" type="button" title="Drops your override and falls back to the library’s intro">Revert to library intro</button>
+          </div>
+          <textarea id="introText" rows="4"></textarea>
+        </div>
+        <div id="settingsList" class="settings-list"></div>
+      </div>
+    </div>
+
+    <!-- Setup overlay — the shared foundation (Master Libraries) -->
+    <div id="setupScreen" class="overlay" hidden>
+      <div class="overlay-card">
+        <div class="overlay-head">
+          <h2>Library Setup — the shared foundation</h2>
+          <div class="overlay-head-actions">
+            <button id="setupDevBtn" type="button" title="Soft developer lock">🔒 Dev</button>
+            <button id="setupCloseBtn" type="button">Close</button>
+          </div>
+        </div>
+        <p class="muted">Build the journal-wide standard a chief editor hands to every editor: pick a <b>Master Library</b>, set its sections, and write its <b>system requests</b>. These are not personal customisations — for those, use <b>Settings</b>. Start a new library from 0 to stay journal-agnostic.</p>
+        <p id="setupLockNote" class="lock-note">🔒 Read-only. Unlock Dev mode (top bar) to author libraries.</p>
+
+        <div class="settings-group">
+          <h4>Master Libraries</h4>
+          <p class="muted">Share a library as a single <code>.json</code> file: <b>Export</b> sends the active library (and your personal layer) to another editor; <b>Import</b> loads one without touching your current work.</p>
+          <div class="setup-lib-share">
+            <button id="exportLibBtn" type="button" title="Save the active library as a .json file to send to other editors">Export library file</button>
+            <label class="file-btn" title="Load a library .json file into your libraries (your current work is kept)">
+              <input id="importLibInput" type="file" accept="application/json" hidden>
+              Import library file
+            </label>
+          </div>
+          <div id="setupLibs" class="setup-libs"></div>
+        </div>
+
+        <div class="settings-group intro-group">
+          <h4>Library intro (default letter opening)</h4>
+          <p class="muted">Shipped with this library; an editor can override it in their own layer (Settings).</p>
+          <textarea id="setupIntro" rows="4"></textarea>
+        </div>
+
+        <div class="settings-group">
+          <h4>Sections</h4>
+          <div id="setupSections"></div>
+        </div>
+
+        <div id="setupRequests" class="settings-list"></div>
+      </div>
+    </div>
+
+    <script>
+// === data.js ===
+const __data = (function () {
+// House-style sections, in the exact order the final letter uses.
+// Middle-pane grouping AND letter order are the same axis — one list drives both.
+const sections = [
+  {
+    "id": "files",
+    "label": "Files & formatting"
+  },
+  {
+    "id": "abstract",
+    "label": "Abstract & editor's summary"
+  },
+  {
+    "id": "authors",
+    "label": "Author information"
+  },
+  {
+    "id": "structure",
+    "label": "Article structure"
+  },
+  {
+    "id": "maintext",
+    "label": "Main text"
+  },
+  {
+    "id": "figures",
+    "label": "Figures & tables"
+  },
+  {
+    "id": "data",
+    "label": "Data & code availability"
+  },
+  {
+    "id": "methods",
+    "label": "Methods"
+  },
+  {
+    "id": "endmatter",
+    "label": "End matter (declarations)"
+  },
+  {
+    "id": "supplementary",
+    "label": "Supplementary information"
+  },
+  {
+    "id": "tpr",
+    "label": "Third-party permissions"
+  },
+  {
+    "id": "sourcedata",
+    "label": "Source data"
+  },
+  {
+    "id": "reporting",
+    "label": "Reporting Summary"
+  },
+  {
+    "id": "forms",
+    "label": "Forms & files to upload"
+  }
+];
+
+// Small generic EXAMPLE library so the app works out of the box.
+// A journal's real Master Library is distributed as a "Library ....json" file
+// (Setup > Export library file) and imported by each editor — it is not code.
+// `groups` = which tab(s) show a request: ea (assistant editor) | editor.
+// [bracketed] tokens are editor fill-ins.
+const seedTemplates = [
+  {
+    "id": "ms_format",
+    "section": "files",
+    "title": "Manuscript not Word/LaTeX",
+    "body": "The main manuscript file is required to be in Microsoft Word or LaTeX format. Please provide your article file accordingly.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "author_checklist",
+    "section": "reporting",
+    "title": "Author Checklist missing/blank",
+    "body": "Please ensure an updated Author Checklist is completed and uploaded as a 'related manuscript' file. All relevant elements of the checklist should be addressed.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "abstract_length",
+    "section": "abstract",
+    "title": "Abstract over 200 words",
+    "body": "Please shorten the abstract to 200 words or fewer.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "abstract_refs",
+    "section": "abstract",
+    "title": "References in abstract",
+    "body": "Please remove references from the abstract.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "editor_summary",
+    "section": "abstract",
+    "title": "Editor's summary to confirm",
+    "body": "Your paper will be accompanied by the following editor's summary. Please let us know if there are any inaccuracies: '[insert editor's summary]'.",
+    "groups": [
+      "editor"
+    ]
+  },
+  {
+    "id": "affiliation_check",
+    "section": "authors",
+    "title": "Confirm names/affiliations/titles",
+    "body": "We ask that you consult with your coauthors to ensure that all names, affiliations, and titles are represented correctly. Note that if any authors are added or removed after this point, all authors will be requested to provide approval documentation that could delay production of your paper.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "corresponding_email",
+    "section": "authors",
+    "title": "Corresponding author email missing",
+    "body": "Please supply a single email address for each corresponding author on the title page. There must be at least one corresponding author.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "section_order",
+    "section": "structure",
+    "title": "Section order incorrect",
+    "body": "Please ensure your main manuscript file includes the following sections, in this order: Title, Author list, Affiliations, Abstract, Introduction, Results, Discussion (optional), Methods, Data Availability, Code Availability (if relevant), References, Acknowledgements, Author Contributions Statement, Competing Interests Statement, Tables, Figure Legends.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "subjective_language",
+    "section": "maintext",
+    "title": "Subjective / novelty language",
+    "body": "Please refrain from using words such as new/novel/first/unique/innovative when referring to the scientific findings, as novelty should be deducible from context. Please also remove exaggerated or subjective language such as 'extremely', 'outstanding', 'fascinating', 'pave the way', 'to the best of our knowledge', etc.",
+    "groups": [
+      "editor"
+    ]
+  },
+  {
+    "id": "figure_legend_title",
+    "section": "figures",
+    "title": "Figure legend/title missing",
+    "body": "All figure legends must include a brief title that summarises the whole figure, be presented below the figure, may be up to 350 words, and must refer to all panels. Any abbreviations, symbols or colours must be defined in the legend.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "tables_editable",
+    "section": "figures",
+    "title": "Table not editable",
+    "body": "Table [number] has been provided in a format that is not editable. Tables must be editable and prepared using the table menu in Word or the table environment in LaTeX.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "data_code_separate",
+    "section": "data",
+    "title": "Data & Code combined",
+    "body": "The Data Availability and Code Availability statements must be included in separate sections, with the Code Availability section placed after the Data Availability section.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "methods_detail",
+    "section": "methods",
+    "title": "Insufficient Methods detail",
+    "body": "Sufficient details of the experiments must be provided in the Methods section such that they could be reproduced without reference to published papers. Use of the term 'as described previously' is not encouraged.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "competing_interests",
+    "section": "endmatter",
+    "title": "Competing interests statement",
+    "body": "A 'Competing interests' declaration must appear in your manuscript. It must refer to all authors and declare both financial and non-financial interests. Acceptable declarations include: 'The Authors declare no competing interests.' or 'The Authors declare the following competing interestsâ¦'. Please ensure the statement is identical in the manuscript and the tracking system.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "si_single_pdf",
+    "section": "supplementary",
+    "title": "SI not a single separate PDF",
+    "body": "All Supplementary Information items (Supplementary Figures, Tables, Methods, Notes, Discussion, References) must be included in one PDF document, provided separately from the manuscript file. Only Supplementary Data, Movie, Software and Audio files should be submitted separately.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "tpr_permission",
+    "section": "tpr",
+    "title": "Third-party content / permissions",
+    "body": "We note suspected third-party content in [figure]. Were these images and every element created by you and/or your co-authors? If material is from a database or previously published, please supply proof of permission for its use (receipt, express permission, confirmation of a compatible Open Access licence or Public Domain), and place the appropriate credit line in the relevant figure legend.",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "source_data",
+    "section": "sourcedata",
+    "title": "Source Data files",
+    "body": "Please supply Source Data files for all data presented in graphs within the Figures and Supplementary Figures, in an acceptable format (.XLSX or .ZIP). Each figure/table's data should be a single sheet/file. Label the file 'Source Data', mention it in the relevant figure legends ('Source data are provided as a Source Data file.'), and add to the Data Availability section: 'Source data are provided with this paper.'",
+    "groups": [
+      "ea"
+    ]
+  },
+  {
+    "id": "file_size",
+    "section": "forms",
+    "title": "File size over 30MB",
+    "body": "Unless otherwise stated, please limit individual file sizes to approximately 30MB. We strongly encourage the use of repositories for large datasets or source data.",
+    "groups": [
+      "ea"
+    ]
+  }
+];
+
+const DEFAULT_INTRO = "Please check the items below carefully and add a response in each row of the table to indicate the changes that you have made. Should you believe any point is not applicable to your manuscript, mark it as \"non-applicable\" and briefly explain why if possible.";
+
+// The whole first-run Master Library, built from the code seed above.
+function seedMasterLibrary() {
+  return {
+    name: "Example journal",
+    intro: DEFAULT_INTRO,
+    sections: structuredClone(sections),
+    requests: structuredClone(seedTemplates)
+  };
+}
+
+return { seedMasterLibrary, DEFAULT_INTRO };
+})();
+const seedMasterLibrary = __data.seedMasterLibrary;
+const DEFAULT_INTRO = __data.DEFAULT_INTRO;
+
+// === storage.js ===
+const store = (function () {
+// Persistence. Talks to server.py (real files in /archive). If the server
+// isn't there (page opened as a bare file://), falls back to localStorage so
+// the app still works — minus on-disk files and DOCX.
+const LS_KEY = "aip-checks-v3";
+let online = true;
+
+async function api(method, path, body) {
+  const res = await fetch("/api/" + path, {
+    method,
+    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) throw new Error(res.status);
+  return res;
+}
+
+function lsAll() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch { return {}; }
+}
+function lsPut(key, value) {
+  const all = lsAll();
+  all[key] = value;
+  localStorage.setItem(LS_KEY, JSON.stringify(all));
+}
+
+// Load all stores at once. Sets `online` based on whether the server answered.
+// `library` is legacy (personal requests, now folded into working) — still read for migration.
+async function loadStores(defaults) {
+  try {
+    const [library, settings, session, masterLibraries, working] = await Promise.all([
+      api("GET", "library").then((r) => r.json()),
+      api("GET", "settings").then((r) => r.json()),
+      api("GET", "session").then((r) => r.json()),
+      api("GET", "masterLibraries").then((r) => r.json()),
+      api("GET", "working").then((r) => r.json())
+    ]);
+    online = true;
+    return {
+      library: library || [],
+      settings: Object.keys(settings || {}).length ? settings : defaults.settings,
+      session: Object.keys(session || {}).length ? session : defaults.session,
+      masterLibraries: masterLibraries || [],
+      working: working || {}
+    };
+  } catch {
+    online = false;
+    const all = lsAll();
+    return {
+      library: all.library || [],
+      settings: all.settings || defaults.settings,
+      session: all.session || defaults.session,
+      masterLibraries: all.masterLibraries || [],
+      working: all.working || {}
+    };
+  }
+}
+
+// Debounced per-store save so typing doesn't hammer the disk.
+const timers = {};
+function save(key, value) {
+  clearTimeout(timers[key]);
+  timers[key] = setTimeout(() => {
+    if (online) api("PUT", key, value).catch(() => lsPut(key, value));
+    else lsPut(key, value);
+  }, 250);
+}
+
+function isOnline() { return online; }
+
+// Named per-manuscript snapshots in archive/checklists/.
+async function listChecklists() {
+  try { return await api("GET", "checklists").then((r) => r.json()); }
+  catch { return []; }
+}
+async function saveChecklist(name, snapshot) {
+  if (online) return api("PUT", "checklists/" + encodeURIComponent(name), snapshot);
+  lsPut("checklist:" + name, snapshot);
+}
+async function getChecklist(name) {
+  try { return await api("GET", "checklists/" + encodeURIComponent(name)).then((r) => r.json()); }
+  catch { return lsAll()["checklist:" + name] || null; }
+}
+
+// Build a .docx and download it. Uses the server when online (keeps an
+// archive/exports/ copy); offline (e.g. the standalone single-file build) it
+// builds the same WordprocessingML in the browser — no Python needed.
+async function exportDocx(title, filename, groups, intro) {
+  if (online) {
+    const res = await api("POST", "docx", { title, filename, groups, intro });
+    triggerDownload(await res.blob(), filename + ".docx");
+    return;
+  }
+  triggerDownload(buildDocxBlob(title, groups, intro), filename + ".docx");
+}
+
+// ---- In-browser DOCX builder (mirrors build_docx in server.py) ----
+const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+function xmlEscape(s) {
+  return String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+function docxRuns(text) {
+  // One <w:p> per line so author-checklist line breaks survive.
+  const lines = (text || "").split("\n");
+  return lines.map((line) =>
+    `<w:p><w:r><w:t xml:space="preserve">${xmlEscape(line)}</w:t></w:r></w:p>`).join("");
+}
+function docxTable(items) {
+  const border = "<w:tblBorders>" +
+    ["top", "left", "bottom", "right", "insideH", "insideV"]
+      .map((e) => `<w:${e} w:val="single" w:sz="4" w:space="0" w:color="auto"/>`).join("") +
+    "</w:tblBorders>";
+  const rows = items.map((text) =>
+    "<w:tr>" +
+    `<w:tc><w:tcPr><w:tcW w:w="6500" w:type="dxa"/></w:tcPr>${docxRuns(text)}</w:tc>` +
+    `<w:tc><w:tcPr><w:tcW w:w="3500" w:type="dxa"/></w:tcPr><w:p/></w:tc>` +
+    "</w:tr>").join("");
+  return '<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>' + border + "</w:tblPr>" +
+    '<w:tblGrid><w:gridCol w:w="6500"/><w:gridCol w:w="3500"/></w:tblGrid>' +
+    rows + "</w:tbl><w:p/>";
+}
+function docxHeading(text, bold, size) {
+  const rpr = (bold ? "<w:b/>" : "") + (size ? `<w:sz w:val="${size}"/>` : "");
+  return `<w:p><w:pPr><w:rPr>${rpr}</w:rPr></w:pPr><w:r><w:rPr>${rpr}</w:rPr>` +
+    `<w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r></w:p>`;
+}
+function buildDocxBlob(title, groups, intro) {
+  let body = docxHeading(title, true, "32");
+  if (intro) body += docxRuns(intro) + "<w:p/>";
+  (groups || []).forEach((g, i) => {
+    body += docxHeading(`${i + 1}. ${g.label}`, true, null);
+    body += docxTable(g.items || []);
+  });
+  const document =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+    `<w:body>${body}<w:sectPr/></w:body></w:document>`;
+  const contentTypes =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+    "</Types>";
+  const rels =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+    "</Relationships>";
+  const zip = zipStore([
+    { name: "[Content_Types].xml", text: contentTypes },
+    { name: "_rels/.rels", text: rels },
+    { name: "word/document.xml", text: document }
+  ]);
+  return new Blob([zip], { type: DOCX_TYPE });
+}
+
+// Minimal store-only (uncompressed) ZIP writer — enough for a .docx package.
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+function zipStore(entries) {
+  const enc = new TextEncoder();
+  const files = entries.map((e) => {
+    const data = enc.encode(e.text);
+    return { name: enc.encode(e.name), data, crc: crc32(data) };
+  });
+  const out = [];
+  let offset = 0;
+  const central = [];
+  const u16 = (n) => [n & 0xff, (n >>> 8) & 0xff];
+  const u32 = (n) => [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
+  for (const f of files) {
+    const header = [
+      ...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(f.crc), ...u32(f.data.length), ...u32(f.data.length),
+      ...u16(f.name.length), ...u16(0)
+    ];
+    out.push(new Uint8Array(header), f.name, f.data);
+    central.push([
+      ...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(f.crc), ...u32(f.data.length), ...u32(f.data.length),
+      ...u16(f.name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0),
+      ...u32(offset), { name: f.name }
+    ]);
+    offset += header.length + f.name.length + f.data.length;
+  }
+  const cdStart = offset;
+  let cdSize = 0;
+  for (const c of central) {
+    const fixed = [];
+    let nameBytes;
+    for (const part of c) {
+      if (part && part.name) nameBytes = part.name;
+      else fixed.push(part);
+    }
+    const head = new Uint8Array(fixed);
+    out.push(head, nameBytes);
+    cdSize += head.length + nameBytes.length;
+  }
+  out.push(new Uint8Array([
+    ...u32(0x06054b50), ...u16(0), ...u16(0),
+    ...u16(files.length), ...u16(files.length),
+    ...u32(cdSize), ...u32(cdStart), ...u16(0)
+  ]));
+  return new Blob(out);
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+return { loadStores, save, isOnline, listChecklists, saveChecklist, getChecklist, exportDocx, triggerDownload };
+})();
+
+// === app.js ===
+
+
+// Two layers:
+//   Master Library  — the journal-wide foundation (sections + system requests), edited in Setup.
+//   Working Library — one personal layer per master: preselected, adaptations, hidden, personal requests.
+// `sections` and `templates` below are derived from the ACTIVE master library (see syncLibrary).
+
+// Middle-pane tabs. 'all' and 'custom' are filter views, not real checklists.
+// (id "custom"; label "(Custom)" — user-authored one-off requests.)
+const TABS = [
+  { id: "all", label: "All", real: false },
+  { id: "ea", label: "EA Requests", real: true },
+  { id: "editor", label: "Editor Requests", real: true },
+  { id: "custom", label: "(Custom)", real: false }
+];
+const SEED_PRESELECTED = ["section_order", "affiliation_check"];   // used only for a brand-new seeded library
+const UNDO_MAX = 5;
+const GROUP_IDS = ["ea", "editor"];                            // taggable checklist memberships
+const GROUP_LABELS = { ea: "EA", editor: "Editor" };
+// "Reporting Summary" used to be a tab (an audience); it is now a SECTION.
+// migrateMaster() moves old reporting-tagged requests into it.
+const RS_SECTION = { id: "reporting", label: "Reporting Summary" };
+
+// Active master's requests, decorated with display order. Rebuilt by syncLibrary().
+let sections = [];
+let templates = [];
+
+function defaults() {
+  return {
+    library: [],   // legacy personal-request store; folded into working on first run
+    settings: {    // app-level prefs only (not library-specific)
+      letterLocked: true,
+      structuredLocked: true,
+      activeChecklists: { ea: true, editor: true },
+      devPassword: ""
+    },
+    session: { manuscript: "", activeTab: "all", selected: [], exportName: "", exportCount: 0 },
+    masterLibraries: [],
+    working: { activeMasterId: null, layers: {} }
+  };
+}
+
+let state = defaults();
+let mode = "edit";
+let devUnlocked = false;
+let undoStack = [];
+let resetSnapshot = null;             // whole-session snapshot taken on Reset, for "Undo reset"
+let editingSettingId = null;          // settings row currently open for inline text editing
+let editingSetupReqId = null;         // setup system-request row open for inline editing
+let expandedCardId = null;            // Edit-stack card left open; others collapse ("__none__" = all collapsed)
+const collapsedCards = new Set();     // cards the user manually collapsed (override the needs-entry auto-expand)
+let checklistView = "sections";       // "sections" (collapsible) | "quick" (flat titles)
+const openSections = new Set();
+const openQuick = new Set();          // quick-list rows showing their description
+
+const $ = (sel) => document.querySelector(sel);
+let el = {};
+
+// ---- library accessors ----
+function newLayer() {
+  return { preselected: [], adaptations: {}, adaptationTitles: {}, hidden: [], tagOverrides: {}, personalRequests: [], introOverride: null };
+}
+function activeMaster() {
+  const ms = state.masterLibraries;
+  return ms.find((m) => m.id === state.working.activeMasterId) || ms[0];
+}
+function ensureLayer(id) {
+  if (!state.working.layers[id]) state.working.layers[id] = newLayer();
+  return state.working.layers[id];
+}
+const L = () => ensureLayer(activeMaster().id);             // active working layer
+const curIntro = () => L().introOverride ?? (activeMaster()?.intro ?? DEFAULT_INTRO);
+
+// Rebuild the module-level `sections`/`templates` from the active master library.
+function syncLibrary() {
+  const m = activeMaster();
+  sections = m?.sections || [];
+  templates = (m?.requests || []).map((t, i) => ({ ...t, order: i + 1 }));
+}
+
+// ---- persistence ----
+const saveSession = () => store.save("session", state.session);
+const saveWorking = () => store.save("working", state.working);
+const saveMasters = () => store.save("masterLibraries", state.masterLibraries);
+const saveSettings = () => store.save("settings", state.settings);
+
+// One-shot: build the first Master Library from code and fold legacy settings/library into its layer.
+// ponytail: one-shot migration, delete after first run lands.
+function migrateToLibraries() {
+  const id = crypto.randomUUID();
+  state.masterLibraries = [{ id, ...seedMasterLibrary() }];
+  const old = state.settings || {};
+  state.working = {
+    activeMasterId: id,
+    layers: {
+      [id]: {
+        preselected: old.defaults || [...SEED_PRESELECTED],
+        adaptations: old.overrides || {},
+        adaptationTitles: old.titleOverrides || {},
+        hidden: old.removed || [],
+        tagOverrides: old.tags || {},
+        personalRequests: (state.library || []).map((e) => ({ ...e, groups: e.groups?.length ? e.groups : (e.group ? [e.group] : ["ea"]) })),
+        introOverride: old.intro && old.intro !== DEFAULT_INTRO ? old.intro : null
+      }
+    }
+  };
+  state.settings = {
+    letterLocked: typeof old.letterLocked === "boolean" ? old.letterLocked : true,
+    structuredLocked: typeof old.structuredLocked === "boolean" ? old.structuredLocked : true,
+    activeChecklists: old.activeChecklists || { ea: true, editor: true },
+    devPassword: old.devPassword || ""
+  };
+  state.library = [];
+  saveMasters(); saveWorking(); saveSettings();
+}
+
+// Old data model had a "reporting" audience tab. Move those requests into a
+// real "Reporting Summary" section instead, in any stored or imported library.
+function migrateMaster(m) {
+  let moved = false;
+  (m.requests || []).forEach((r) => {
+    if (!r.groups?.includes("reporting")) return;
+    r.section = RS_SECTION.id;
+    r.groups = r.groups.filter((g) => g !== "reporting");
+    if (!r.groups.length) r.groups = ["ea"];
+    moved = true;
+  });
+  m.sections ||= [];
+  if (moved && !m.sections.some((s) => s.id === RS_SECTION.id)) {
+    const i = m.sections.findIndex((s) => s.id === "forms");
+    m.sections.splice(i === -1 ? m.sections.length : i, 0, { ...RS_SECTION });
+  }
+}
+
+function migrate() {
+  const s = state.settings;
+  if (typeof s.letterLocked !== "boolean") s.letterLocked = true;
+  if (typeof s.structuredLocked !== "boolean") s.structuredLocked = true;
+  s.devPassword ||= "";
+  s.activeChecklists ||= { ea: true, editor: true };
+  delete s.activeChecklists.reporting;
+  state.session.selected ||= [];
+  state.session.activeTab ||= "all";
+  if (state.session.activeTab === "reporting") state.session.activeTab = "all";
+  state.masterLibraries.forEach(migrateMaster);
+  state.working ||= { activeMasterId: null, layers: {} };
+  state.working.layers ||= {};
+  if (!state.working.activeMasterId && state.masterLibraries[0]) state.working.activeMasterId = state.masterLibraries[0].id;
+  const layer = L();
+  layer.preselected ||= [];
+  layer.adaptations ||= {};
+  layer.adaptationTitles ||= {};
+  layer.hidden ||= [];
+  layer.tagOverrides ||= {};
+  layer.personalRequests ||= [];
+  if (!("introOverride" in layer)) layer.introOverride = null;
+  layer.personalRequests.forEach((e) => { if (!Array.isArray(e.groups)) e.groups = e.group ? [e.group] : ["ea"]; });
+  // Strip the retired "reporting" tag from every personal layer.
+  Object.values(state.working.layers).forEach((ly) => {
+    Object.keys(ly.tagOverrides || {}).forEach((k) => {
+      ly.tagOverrides[k] = ly.tagOverrides[k].filter((g) => g !== "reporting");
+      if (!ly.tagOverrides[k].length) delete ly.tagOverrides[k];
+    });
+    (ly.personalRequests || []).forEach((e) => {
+      if (!Array.isArray(e.groups)) return;
+      e.groups = e.groups.filter((g) => g !== "reporting");
+      if (!e.groups.length) e.groups = ["ea"];
+    });
+  });
+  // Selected cards keep their letter section in sync with the (possibly migrated) library.
+  const reqs = activeMaster()?.requests || [];
+  state.session.selected.forEach((it) => {
+    const t = it.templateId && !it.custom && reqs.find((r) => r.id === it.templateId);
+    if (t) it.location = t.section;
+  });
+}
+
+const templateById = (id) => templates.find((x) => x.id === id);
+// Which tabs a request appears in. Falls back to the template's own `groups`.
+const templateGroups = (id) =>
+  L().tagOverrides[id]?.length ? L().tagOverrides[id] : (templateById(id)?.groups?.length ? templateById(id).groups : ["ea"]);
+const libGroups = (e) => e.groups?.length ? e.groups : ["ea"];
+const overrideBody = (t) => L().adaptations[t.id] ?? t.body;
+const overrideTitle = (t) => L().adaptationTitles[t.id] ?? t.title;
+const isTplEdited = (id) => L().adaptations[id] != null || L().adaptationTitles[id] != null;   // "adapted"
+const hasBrackets = (text) => /\[[^\]]+\]/.test(text || "");
+const isHidden = (id) => L().hidden.includes(id);
+
+function applyDefaults() {
+  L().preselected.forEach((id) => {
+    if (state.session.selected.some((sel) => sel.templateId === id)) return;
+    const t = templates.find((x) => x.id === id);
+    if (t) return state.session.selected.push(makeSelected(t));
+    const e = L().personalRequests.find((x) => x.id === id);
+    if (e) state.session.selected.push(makeSelectedFromLib(e));
+  });
+}
+
+// ---- selected-item helpers ----
+function makeSelected(template) {
+  const override = L().adaptations[template.id];   // adapted system request, if any
+  return {
+    id: crypto.randomUUID(),
+    templateId: template.id,
+    title: overrideTitle(template),
+    location: template.section,
+    groups: templateGroups(template.id),
+    originalBody: template.body,
+    customText: override ?? null,
+    useOriginal: false,
+    custom: false,
+    savedToLibrary: override != null,
+    needsCustom: template.needsCustom || hasBrackets(override ?? template.body),
+    customConfirmed: false,
+    addedAt: Date.now()
+  };
+}
+
+function makeSelectedFromLib(e) {
+  return {
+    id: crypto.randomUUID(),
+    templateId: e.id,                 // reuse lib id so the middle-pane checkbox stays in sync
+    title: e.title,
+    location: e.section,
+    groups: libGroups(e),
+    originalBody: null,
+    customText: e.body,
+    useOriginal: false,
+    custom: true,
+    savedToLibrary: true,
+    needsCustom: hasBrackets(e.body),
+    customConfirmed: false,
+    addedAt: Date.now()
+  };
+}
+const selected = () => state.session.selected;
+function displayText(item) {
+  if (item.useOriginal && item.originalBody != null) return item.originalBody;
+  return item.customText != null ? item.customText : (item.originalBody || "");
+}
+function isEdited(item) {
+  return item.originalBody != null && item.customText != null &&
+    item.customText.trim() !== item.originalBody.trim();
+}
+const needsEntry = (item) => hasBrackets(displayText(item));
+const itemNeedsCustom = (item) => item.needsCustom ?? needsEntry(item);
+const isSelected = (tid) => selected().some((i) => i.templateId === tid);
+const openCardId = () => expandedCardId ?? selected()[selected().length - 1]?.id;
+// A card stays open if it's the focused card, or it still needs entry and the user hasn't collapsed it.
+const isCardOpen = (item) =>
+  item.id === openCardId() ||
+  (itemNeedsCustom(item) && !item.customConfirmed && !collapsedCards.has(item.id));
+
+// ---- mutations ----
+// Add by id from either store: system request or personal request.
+function addById(id) {
+  if (isSelected(id)) return;
+  const t = templates.find((x) => x.id === id);
+  const e = !t && L().personalRequests.find((x) => x.id === id);
+  if (!t && !e) return;
+  selected().push(t ? makeSelected(t) : makeSelectedFromLib(e));
+  expandedCardId = selected()[selected().length - 1].id;
+  saveSession();
+  render();
+  if (mode === "edit") focusCard(selected()[selected().length - 1].id);
+}
+
+function removeSelected(id) {
+  const arr = selected();
+  const index = arr.findIndex((i) => i.id === id || i.templateId === id);
+  if (index === -1) return;
+  const item = arr[index];
+  if (isEdited(item) && !item.savedToLibrary &&
+      !confirm("This request was edited and is not saved to your library. Remove anyway?")) return;
+  undoStack.push({ item, index });
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  arr.splice(index, 1);
+  saveSession();
+  render();
+}
+
+function undoRemoval() {
+  const last = undoStack.pop();
+  if (!last) return;
+  selected().splice(Math.min(last.index, selected().length), 0, last.item);
+  saveSession();
+  render();
+}
+
+function addCustom() {
+  const text = el.customText.value.trim();
+  if (!text) return;
+  const tab = state.session.activeTab;
+  const item = {
+    id: crypto.randomUUID(),
+    templateId: null,
+    title: el.customTitle.value.trim() || "Custom request",
+    location: el.customLocation.value,
+    groups: [tab === "custom" ? "ea" : tab],
+    originalBody: null,
+    customText: text,
+    useOriginal: false,
+    custom: true,
+    savedToLibrary: false,
+    needsCustom: hasBrackets(text),
+    customConfirmed: false,
+    addedAt: Date.now()
+  };
+  if (el.customSaveLib.checked) { saveToLibrary(item); item.savedToLibrary = true; }
+  selected().push(item);
+  expandedCardId = item.id;
+  el.customText.value = "";
+  el.customTitle.value = "";
+  el.customSaveLib.checked = false;
+  saveSession();
+  render();
+  if (mode === "edit") focusCard(item.id);
+}
+
+function saveToLibrary(item) {
+  const body = displayText(item);
+  if (L().personalRequests.some((e) => e.body.trim() === body.trim())) return; // de-dupe
+  L().personalRequests.push({
+    id: crypto.randomUUID(),
+    title: item.title || "Custom request",
+    groups: item.groups || ["ea"],
+    section: item.location,
+    body
+  });
+  saveWorking();
+}
+
+function saveSelectedToLibrary(id) {
+  const item = selected().find((x) => x.id === id);
+  if (!item) return;
+  // Edited system request → save as an adaptation that replaces the original in the middle pane
+  // (the per-card "original" toggle still falls back to the system text).
+  if (item.templateId && !item.custom) {
+    L().adaptations[item.templateId] = displayText(item);
+    item.savedToLibrary = true;
+    saveWorking();
+    saveSession();
+    render();
+    return flash("Saved — adapts the system request in your checklist");
+  }
+  saveToLibrary(item);
+  item.savedToLibrary = true;
+  saveSession();
+  render();
+  flash("Saved to your library");
+}
+
+// Toggle which tabs a request shows in. Keeps at least one group so it stays reachable.
+function setTag(id, group, on) {
+  const t = templates.find((x) => x.id === id);
+  const e = !t && L().personalRequests.find((x) => x.id === id);
+  const set = new Set(t ? templateGroups(id) : libGroups(e));
+  on ? set.add(group) : set.delete(group);
+  if (!set.size) set.add("ea");
+  if (t) { L().tagOverrides[id] = [...set]; saveWorking(); }
+  else if (e) { e.groups = [...set]; saveWorking(); }
+  renderSettings();
+  renderChecklist();
+}
+
+function move(id, dir) {
+  const arr = selected();
+  const item = arr.find((x) => x.id === id);
+  if (!item) return;
+  const siblings = arr.filter((x) => x.location === item.location);
+  const swap = siblings[siblings.indexOf(item) + dir];
+  if (!swap) return;
+  const a = arr.indexOf(item), b = arr.indexOf(swap);
+  [arr[a], arr[b]] = [arr[b], arr[a]];
+  saveSession();
+  renderLetter();
+}
+
+// Sort the cards into the standard section order (same order Structured uses). Stable: keeps within-section order.
+function orderCards() {
+  const rank = (id) => { const i = sections.findIndex((s) => s.id === id); return i === -1 ? sections.length : i; };
+  selected().sort((a, b) => rank(a.location) - rank(b.location));
+  saveSession();
+  renderLetter();
+}
+
+// ---- dev mode (soft protection) ----
+function toggleDev() {
+  if (devUnlocked) { devUnlocked = false; updateDevButton(); renderSettings(); renderSetup(); return; }
+  const pw = state.settings.devPassword;
+  if (!pw) {
+    const set = prompt("Set a developer password (soft lock — not encrypted):");
+    if (set == null) return;
+    if (set !== prompt("Confirm password:")) return alert("Passwords did not match.");
+    state.settings.devPassword = set;
+    saveSettings();
+    devUnlocked = true;
+  } else {
+    if (prompt("Developer password:") !== pw) return alert("Wrong password.");
+    devUnlocked = true;
+  }
+  updateDevButton();
+  renderSettings();
+  renderSetup();
+}
+function requireDev() {
+  if (devUnlocked) return true;
+  alert("Developer mode is locked. Unlock it (top bar) to change protected settings.");
+  return false;
+}
+function updateDevButton() {
+  [el.devBtn, el.settingsDevBtn, el.setupDevBtn].forEach((b) => {
+    if (!b) return;
+    b.textContent = devUnlocked ? "🔓 Dev" : "🔒 Dev";
+    b.classList.toggle("on", devUnlocked);
+  });
+}
+
+// ---- render ----
+function render() {
+  syncLibrary();
+  renderTabs();
+  renderLocations();
+  renderChecklist();
+  renderLetter();
+  syncLock();
+}
+
+// Flagged (selected) count for a tab — "all" is the grand total, others count by membership.
+function tabFlagged(id) {
+  const sel = selected();
+  if (id === "all") return sel.length;
+  if (id === "custom") return sel.filter((i) => i.custom).length;
+  return sel.filter((i) => (i.groups?.length ? i.groups : ["ea"]).includes(id)).length;
+}
+
+function renderTabs() {
+  el.tabbar.innerHTML = TABS.map((tab) => {
+    const active = state.session.activeTab === tab.id ? "active" : "";
+    const toggle = tab.real
+      ? `<input type="checkbox" class="tab-active" data-tab="${tab.id}" ${state.settings.activeChecklists[tab.id] ? "checked" : ""} title="Activate checklist (Dev)">`
+      : "";
+    const n = tabFlagged(tab.id);
+    const badge = n ? `<span class="tab-flagged" title="${n} flagged">${n}</span>` : "";
+    return `<button type="button" class="tab ${active}" data-tab="${tab.id}">${toggle}${escapeHtml(tab.label)}${badge}</button>`;
+  }).join("");
+}
+
+function renderLocations() {
+  el.customLocation.innerHTML = sections
+    .map((s, i) => `<option value="${s.id}">${i + 1}. ${s.label}</option>`)
+    .join("");
+}
+
+function renderChecklist() {
+  const query = el.searchInput.value.trim().toLowerCase();
+  const tab = state.session.activeTab;
+
+  if (GROUP_IDS.includes(tab) && !state.settings.activeChecklists[tab]) {
+    el.categoryList.innerHTML = `<div class="empty-state">Checklist “${TABS.find((t) => t.id === tab).label}” is off. Tick its box in the tab bar (Dev mode) to activate.</div>`;
+    return;
+  }
+
+  let pool = templates.filter((t) => !isHidden(t.id)).map((t) =>
+    ({ id: t.id, title: overrideTitle(t), section: t.section, body: overrideBody(t), groups: templateGroups(t.id), fromLib: false, edited: isTplEdited(t.id) }));
+  L().personalRequests.forEach((e) => pool.push({ id: e.id, title: e.title + " (Custom)", section: e.section, body: e.body, groups: libGroups(e), fromLib: true }));
+
+  const list = pool.filter((t) => {
+    if (tab === "custom") { if (!t.fromLib) return false; }   // (Custom) tab = your custom requests, deduped
+    else if (tab !== "all" && !t.groups.includes(tab)) return false;  // 'all' shows everything; tabs filter by membership
+    const hay = `${t.title} ${t.body}`.toLowerCase();
+    return !query || hay.includes(query);
+  });
+
+  if (checklistView === "quick") return renderQuickList(list, query);
+
+  el.categoryList.innerHTML = "";
+  sections.forEach((section) => {
+    const items = list.filter((t) => t.section === section.id);
+    if (!items.length) return;
+    const selCount = items.filter((i) => isSelected(i.id)).length;
+    const details = document.createElement("details");
+    details.className = "category";
+    details.dataset.section = section.id;
+    details.open = openSections.has(section.id) || Boolean(query);
+    details.innerHTML = `<summary><span>${escapeHtml(section.label)}</span>
+      <span class="count">${selCount ? `<span class="flagged">${selCount} flagged</span> · ` : ""}${items.length}</span></summary>`;
+    items.forEach((t) => {
+      const label = document.createElement("label");
+      label.className = "issue";
+      label.innerHTML = `<input type="checkbox" ${isSelected(t.id) ? "checked" : ""} data-id="${t.id}">
+        <span><span class="issue-title">${escapeHtml(t.title)}${t.edited ? '<span class="tag custom-flag">adapted</span>' : ""}</span>
+        <span class="issue-template">${escapeHtml(t.body)}</span></span>`;
+      details.append(label);
+    });
+    el.categoryList.append(details);
+  });
+  if (!el.categoryList.children.length) {
+    el.categoryList.innerHTML = `<div class="empty-state">No requests in this checklist${query ? " match your search" : ""}.</div>`;
+  }
+}
+
+// Flat, dense list: titles only, no per-row description until clicked. No custom box. For fast editors.
+function renderQuickList(list, query) {
+  el.categoryList.innerHTML = "";
+  sections.forEach((section) => {
+    const items = list.filter((t) => t.section === section.id);
+    if (!items.length) return;
+    const group = document.createElement("div");
+    group.className = "quick-group";
+    group.innerHTML = `<div class="quick-head">${escapeHtml(section.label)}</div>` +
+      items.map((t) => `<div class="quick-row ${isSelected(t.id) ? "sel" : ""}">
+        <input type="checkbox" ${isSelected(t.id) ? "checked" : ""} data-id="${t.id}">
+        <button type="button" class="quick-title" data-desc="${t.id}">${escapeHtml(t.title)}${t.edited ? ' <span class="tag custom-flag">adapted</span>' : ""}</button>
+        <div class="quick-body" data-body="${t.id}" ${openQuick.has(t.id) ? "" : "hidden"}>${escapeHtml(t.body)}</div>
+      </div>`).join("");
+    el.categoryList.append(group);
+  });
+  if (!el.categoryList.children.length) {
+    el.categoryList.innerHTML = `<div class="empty-state">No requests in this checklist${query ? " match your search" : ""}.</div>`;
+  }
+}
+
+function renderLetter() {
+  const heading = state.session.manuscript
+    ? `<p class="letter-ms">Manuscript: <strong>${escapeHtml(state.session.manuscript)}</strong></p>` : "";
+
+  if (!selected().length) {
+    el.letterBody.innerHTML = `${heading}<div class="empty-state">No requests yet. Tick an issue in the middle pane, or add a custom request.</div>`;
+    return updateFoot();
+  }
+
+  if (mode === "preview") {
+    const groups = groupBy(selected(), (i) => i.location);
+    const locked = state.settings.structuredLocked;
+    el.letterBody.innerHTML = `<article class="preview-doc">${heading}
+      <p class="preview-intro">${escapeHtml(curIntro()).replaceAll("\n", "<br>")}</p>
+      ${sections.filter((s) => groups.has(s.id)).map((section, i) => {
+        const items = groups.get(section.id);
+        return `<section class="preview-section"><h3>${i + 1}. ${escapeHtml(section.label)}</h3>
+          <ul class="preview-list">${items.map((item, j) => `<li data-id="${item.id}">
+            <span class="li-text">${escapeHtml(displayText(item))}</span>
+            ${item.custom ? '<span class="tag">Custom</span>' : ""}
+            ${locked ? "" : `<span class="li-actions">
+              <button type="button" data-move="up" data-id="${item.id}" ${j === 0 ? "disabled" : ""}>↑</button>
+              <button type="button" data-move="down" data-id="${item.id}" ${j === items.length - 1 ? "disabled" : ""}>↓</button>
+              <button type="button" class="remove-btn" data-remove="${item.id}">✕</button></span>`}
+          </li>`).join("")}</ul></section>`;
+      }).join("")}</article>`;
+    return updateFoot();
+  }
+
+  const locked = state.settings.letterLocked;
+  el.letterBody.innerHTML = heading + selected().map((item) => {
+    const section = sections.find((e) => e.id === item.location);
+    const edited = isEdited(item);
+    const collapsed = !isCardOpen(item);
+    const needsCustom = itemNeedsCustom(item);
+    return `<article class="card ${item.custom ? "custom" : ""} ${needsCustom ? "needs-entry" : ""} ${collapsed ? "collapsed" : ""}" data-id="${item.id}">
+      <div class="card-head">
+        <button class="card-toggle" type="button" data-toggle="${item.id}" title="${collapsed ? "Expand" : "Collapse"}">${collapsed ? "▸" : "▾"}</button>
+        <div class="card-headmain"><div class="card-titlerow">
+          <input class="card-title-input" type="text" data-title="${item.id}" value="${escapeHtml(item.title)}" ${locked ? "readonly" : ""}>
+          ${item.custom ? '<span class="tag">Custom</span>' : ""}</div>
+          <div class="meta">${escapeHtml(section?.label || "Other")} · ${item.custom ? "custom" : "system"}${item.savedToLibrary ? " · saved" : ""}</div></div>
+        <div class="card-actions">
+          ${needsCustom ? `<label class="custom-confirm ${item.customConfirmed ? "done" : ""}" title="Tick once you have filled in this request"><input type="checkbox" data-confirm="${item.id}" ${item.customConfirmed ? "checked" : ""}> needs entry</label>` : ""}
+          ${edited ? `<label class="origtoggle"><input type="checkbox" data-orig="${item.id}" ${item.useOriginal ? "checked" : ""}> original</label>` : ""}
+          ${item.savedToLibrary ? "" : `<button class="ghost-btn icon-btn" type="button" data-savelib="${item.id}" title="Save to your library" aria-label="Save to your library">💾</button>`}
+          <button class="remove-btn icon-btn" type="button" data-remove="${item.id}" title="Remove" aria-label="Remove">✕</button></div>
+      </div>
+      <textarea rows="4" data-edit="${item.id}" ${locked ? "readonly" : ""}>${escapeHtml(displayText(item))}</textarea>
+    </article>`;
+  }).join("");
+  updateFoot();
+}
+
+function updateFoot() {
+  const n = selected().length;
+  el.footInfo.textContent =
+    (n ? `${n} request${n === 1 ? "" : "s"} · ${L().personalRequests.length} in your library` : "") +
+    (store.isOnline() ? "" : "  ·  offline (no server)");
+  el.undoBtn.hidden = undoStack.length === 0;
+  el.undoResetBtn.hidden = resetSnapshot === null;
+  const warnN = selected().filter((i) => itemNeedsCustom(i) && !i.customConfirmed).length;
+  el.docxWarn.hidden = warnN === 0;
+  el.docxWarn.title = warnN ? `${warnN} request(s) needing customisation not marked done` : "";
+}
+
+// ---- Settings overlay (personal layer) ----
+function settingsRow({ id, title, rawTitle, body, groups, fromLib, edited }) {
+  const dis = !devUnlocked ? "disabled" : "";
+  if (editingSettingId === id) {
+    return `<div class="settings-row editing">
+      <input class="settings-edit-title" type="text" data-edit-title="${id}" value="${escapeHtml(rawTitle ?? title)}" placeholder="Title">
+      <textarea class="settings-edit" data-edit-id="${id}" rows="5">${escapeHtml(body)}</textarea>
+      <div class="settings-edit-actions">
+        <button type="button" data-save="${id}">Save</button>
+        ${!fromLib && edited ? `<button type="button" data-revert="${id}">Revert to system text</button>` : ""}
+        <button type="button" data-canceledit="1">Cancel</button>
+      </div></div>`;
+  }
+  const on = L().preselected.includes(id);
+  const tags = GROUP_IDS.map((g) => `<label class="tag-check"><input type="checkbox" data-tag="${id}" data-group="${g}"
+    ${groups.includes(g) ? "checked" : ""} ${dis}> ${GROUP_LABELS[g]}</label>`).join("");
+  return `<div class="settings-row">
+    <label class="settings-default"><input type="checkbox" data-default="${id}" ${on ? "checked" : ""} ${dis}> preselected</label>
+    <button type="button" class="settings-name" data-editrow="${id}" title="${escapeHtml(body)}">${escapeHtml(title)}${edited ? ' <span class="tag custom-flag">adapted</span>' : ""}</button>
+    <span class="settings-tags">${tags}</span>
+    <button type="button" class="settings-del" data-del="${id}" data-lib="${fromLib ? 1 : 0}" ${dis} title="${fromLib ? "Delete this custom request" : "Hide this system request (can be restored)"}">×</button>
+  </div>`;
+}
+
+function renderSettings() {
+  if (!el.settingsList) return;
+  el.settingsLockNote.hidden = devUnlocked;
+  el.introText.value = curIntro();
+  el.introText.disabled = !devUnlocked;
+  el.introRevertBtn.disabled = !devUnlocked;
+  let html = sections.map((section) => {
+    const items = templates.filter((t) => t.section === section.id && !isHidden(t.id));
+    if (!items.length) return "";
+    return `<div class="settings-group"><h4>${escapeHtml(section.label)}</h4>${
+      items.map((t) => settingsRow({ id: t.id, title: overrideTitle(t), rawTitle: overrideTitle(t), body: overrideBody(t), groups: templateGroups(t.id), fromLib: false, edited: isTplEdited(t.id) })).join("")
+    }</div>`;
+  }).join("");
+  if (L().personalRequests.length) {
+    html += `<div class="settings-group"><h4>Custom requests</h4>${
+      L().personalRequests.map((e) => settingsRow({ id: e.id, title: e.title + " (Custom)", rawTitle: e.title, body: e.body, groups: libGroups(e), fromLib: true, edited: false })).join("")
+    }</div>`;
+  }
+  const hidden = templates.filter((t) => isHidden(t.id));
+  if (hidden.length) {
+    html += `<div class="settings-group"><h4>Hidden system requests</h4>${
+      hidden.map((t) => `<div class="settings-row"><span class="settings-name struck">${escapeHtml(t.title)}</span>
+        <button type="button" data-restore="${t.id}" ${devUnlocked ? "" : "disabled"}>Restore</button></div>`).join("")
+    }</div>`;
+  }
+  el.settingsList.innerHTML = html;
+}
+
+// Inline personal-layer editing (Settings). All dev-gated.
+function startEditSetting(id) {
+  if (!requireDev()) return;
+  editingSettingId = id;
+  renderSettings();
+  const ta = el.settingsList.querySelector(`textarea[data-edit-id="${id}"]`);
+  if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+}
+function saveEditSetting(id) {
+  const ta = el.settingsList.querySelector(`textarea[data-edit-id="${id}"]`);
+  if (!ta) return;
+  const value = ta.value;
+  const ti = el.settingsList.querySelector(`input[data-edit-title="${id}"]`);
+  const title = ti ? ti.value.trim() : "";
+  const t = templateById(id);
+  if (t) {                                  // adapted system request → store in the layer (system source kept in the library)
+    if (value.trim() === t.body.trim()) delete L().adaptations[id];
+    else L().adaptations[id] = value;
+    if (title && title !== t.title) L().adaptationTitles[id] = title;
+    else delete L().adaptationTitles[id];
+    saveWorking();
+  } else {
+    const e = L().personalRequests.find((x) => x.id === id);
+    if (e) { e.body = value; if (title) e.title = title; saveWorking(); }
+  }
+  editingSettingId = null;
+  renderSettings();
+  renderChecklist();
+  flash("Saved");
+}
+function revertSetting(id) {
+  delete L().adaptations[id];
+  delete L().adaptationTitles[id];
+  saveWorking();
+  editingSettingId = null;
+  renderSettings();
+  renderChecklist();
+  flash("Reverted to system text");
+}
+function deleteSetting(id, fromLib) {
+  if (!requireDev()) return;
+  if (fromLib) {
+    if (!confirm("Delete this custom request from your library?")) return;
+    L().personalRequests = L().personalRequests.filter((e) => e.id !== id);
+    saveWorking();
+  } else {
+    if (!confirm("Hide this system request? You can restore it later in Settings.")) return;
+    if (!L().hidden.includes(id)) L().hidden.push(id);
+    saveWorking();
+  }
+  renderSettings();
+  renderChecklist();
+}
+function restoreSetting(id) {
+  if (!requireDev()) return;
+  L().hidden = L().hidden.filter((x) => x !== id);
+  saveWorking();
+  renderSettings();
+  renderChecklist();
+}
+
+// ---- Setup overlay (Master Libraries — the foundation) ----
+function groupChecksHtml(selectedGroups, attr) {
+  return GROUP_IDS.map((g) => `<label class="tag-check"><input type="checkbox" ${attr}="${g}"
+    ${selectedGroups.includes(g) ? "checked" : ""}> ${GROUP_LABELS[g]}</label>`).join("");
+}
+
+function renderSetup() {
+  if (!el.setupScreen || el.setupScreen.hidden) return;
+  el.setupLockNote.hidden = devUnlocked;
+  const m = activeMaster();
+  // Library picker
+  el.setupLibs.innerHTML = state.masterLibraries.map((lib) =>
+    `<div class="setup-lib-row ${lib.id === m.id ? "active" : ""}">
+      <label><input type="radio" name="activeLib" data-activate="${lib.id}" ${lib.id === m.id ? "checked" : ""}> <strong>${escapeHtml(lib.name)}</strong></label>
+      <span class="muted">${(lib.requests || []).length} requests · ${(lib.sections || []).length} sections</span>
+      <span class="setup-lib-actions">
+        <button type="button" data-renamelib="${lib.id}" ${devUnlocked ? "" : "disabled"}>Rename</button>
+        <button type="button" data-duplib="${lib.id}" ${devUnlocked ? "" : "disabled"}>Duplicate</button>
+        <button type="button" data-dellib="${lib.id}" ${devUnlocked && state.masterLibraries.length > 1 ? "" : "disabled"}>Delete</button>
+      </span>
+    </div>`).join("") +
+    `<div class="setup-add"><button type="button" data-newlib="1" ${devUnlocked ? "" : "disabled"}>+ New empty library (start from 0)</button></div>`;
+
+  // Intro (chief-editor default for this library)
+  el.setupIntro.value = m.intro ?? DEFAULT_INTRO;
+  el.setupIntro.disabled = !devUnlocked;
+
+  // Sections
+  const dis = devUnlocked ? "" : "disabled";
+  el.setupSections.innerHTML = (m.sections || []).map((s, i) =>
+    `<div class="setup-section-row">
+      <input type="text" data-secname="${s.id}" value="${escapeHtml(s.label)}" ${dis}>
+      <button type="button" data-secup="${s.id}" ${dis || (i === 0 ? "disabled" : "")}>↑</button>
+      <button type="button" data-secdown="${s.id}" ${dis || (i === m.sections.length - 1 ? "disabled" : "")}>↓</button>
+      <button type="button" data-secdel="${s.id}" ${dis}>×</button>
+    </div>`).join("") +
+    `<div class="setup-add"><input id="newSectionName" type="text" placeholder="New section name" ${dis}>
+      <button type="button" data-addsec="1" ${dis}>Add section</button></div>`;
+
+  // System requests
+  el.setupRequests.innerHTML = renderSetupRequests(m);
+}
+
+function setupReqRow(r) {
+  if (editingSetupReqId === r.id) {
+    return `<div class="settings-row editing">
+      <input class="settings-edit-title" type="text" data-req-title="${r.id}" value="${escapeHtml(r.title)}" placeholder="Title">
+      <textarea class="settings-edit" data-req-body="${r.id}" rows="5">${escapeHtml(r.body)}</textarea>
+      <div class="setup-req-meta">
+        <select data-req-section="${r.id}">${sections.map((s) => `<option value="${s.id}" ${s.id === r.section ? "selected" : ""}>${escapeHtml(s.label)}</option>`).join("")}</select>
+        <span class="settings-tags">${groupChecksHtml(libGroups(r), "data-req-group")}</span>
+      </div>
+      <div class="settings-edit-actions">
+        <button type="button" data-reqsave="${r.id}">Save</button>
+        <button type="button" data-reqcancel="1">Cancel</button>
+      </div></div>`;
+  }
+  const dis = devUnlocked ? "" : "disabled";
+  return `<div class="settings-row">
+    <button type="button" class="settings-name" data-reqedit="${r.id}" title="${escapeHtml(r.body)}">${escapeHtml(r.title)}</button>
+    <span class="muted">${libGroups(r).map((g) => GROUP_LABELS[g]).join(", ")}</span>
+    <button type="button" class="settings-del" data-reqdel="${r.id}" ${dis} title="Delete this system request">×</button>
+  </div>`;
+}
+
+function renderSetupRequests(m) {
+  let html = (m.sections || []).map((section) => {
+    const items = (m.requests || []).filter((r) => r.section === section.id);
+    if (!items.length) return "";
+    return `<div class="settings-group"><h4>${escapeHtml(section.label)}</h4>${items.map(setupReqRow).join("")}</div>`;
+  }).join("");
+  const orphans = (m.requests || []).filter((r) => !(m.sections || []).some((s) => s.id === r.section));
+  if (orphans.length) html += `<div class="settings-group"><h4>Unassigned (section removed)</h4>${orphans.map(setupReqRow).join("")}</div>`;
+  // Add-new form
+  const dis = devUnlocked ? "" : "disabled";
+  html += `<div class="settings-group setup-newreq"><h4>Add a system request</h4>
+    <input id="newReqTitle" type="text" placeholder="Title" ${dis}>
+    <textarea id="newReqBody" rows="3" placeholder="Request text. [bracketed] tokens become editor fill-ins." ${dis}></textarea>
+    <div class="setup-req-meta">
+      <select id="newReqSection" ${dis}>${(m.sections || []).map((s) => `<option value="${s.id}">${escapeHtml(s.label)}</option>`).join("")}</select>
+      <span class="settings-tags">${groupChecksHtml(["ea"], "data-newreq-group")}</span>
+      <button type="button" data-addreq="1" ${dis}>Add</button>
+    </div></div>`;
+  return html;
+}
+
+// Master-library mutations (all dev-gated)
+function setActiveMaster(id) {
+  if (!state.masterLibraries.some((m) => m.id === id)) return;
+  state.working.activeMasterId = id;
+  ensureLayer(id);
+  saveWorking();
+  render();
+  renderSettings();
+  renderSetup();
+}
+function afterMasterEdit() {
+  saveMasters();
+  render();
+  renderSetup();
+}
+function newLibrary() {
+  if (!requireDev()) return;
+  const name = (prompt("Name for the new (empty) library:", "New library") || "").trim();
+  if (!name) return;
+  const id = crypto.randomUUID();
+  state.masterLibraries.push({ id, name, intro: DEFAULT_INTRO, sections: [], requests: [] });
+  state.working.activeMasterId = id;
+  ensureLayer(id);
+  saveMasters(); saveWorking();
+  render();
+  renderSettings();
+  renderSetup();
+}
+function renameLibrary(id) {
+  if (!requireDev()) return;
+  const lib = state.masterLibraries.find((m) => m.id === id);
+  if (!lib) return;
+  const name = (prompt("Library name:", lib.name) || "").trim();
+  if (!name) return;
+  lib.name = name;
+  afterMasterEdit();
+}
+function duplicateLibrary(id) {
+  if (!requireDev()) return;
+  const lib = state.masterLibraries.find((m) => m.id === id);
+  if (!lib) return;
+  state.masterLibraries.push({ ...structuredClone(lib), id: crypto.randomUUID(), name: lib.name + " copy" });
+  afterMasterEdit();
+}
+function deleteLibrary(id) {
+  if (!requireDev()) return;
+  if (state.masterLibraries.length <= 1) return alert("Keep at least one library.");
+  if (!confirm("Delete this library and its personal layer? This cannot be undone.")) return;
+  state.masterLibraries = state.masterLibraries.filter((m) => m.id !== id);
+  delete state.working.layers[id];
+  if (state.working.activeMasterId === id) state.working.activeMasterId = state.masterLibraries[0].id;
+  ensureLayer(activeMaster().id);
+  saveMasters(); saveWorking();
+  render();
+  renderSettings();
+  renderSetup();
+}
+// Library file — the chief-editor / shared-setup package. Carries the active master
+// library plus its working layer (preselected, adaptations, custom requests), so a
+// recipient gets a ready-to-use library without touching their in-progress work.
+function exportLibrary() {
+  const m = activeMaster();
+  const bundle = {
+    kind: "library",
+    masterLibraries: [structuredClone(m)],
+    layers: { [m.id]: structuredClone(ensureLayer(m.id)) },
+    savedAt: new Date().toISOString()
+  };
+  const safe = (m.name || "Library").replace(/[^A-Za-z0-9 ._-]+/g, " ").trim() || "Library";
+  store.triggerDownload(new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }), `Library - ${safe}.json`);
+  flash(`Exported library “${m.name}”.`);
+}
+function importLibrary(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const loaded = JSON.parse(reader.result);
+      const libs = loaded.masterLibraries;
+      if (!Array.isArray(libs) || !libs.length || !libs[0].id || !Array.isArray(libs[0].requests))
+        throw new Error("not a library file");
+      const names = libs.map((l) => l.name).join(", ");
+      if (!confirm(`Import library “${names}”? It is added to your libraries (existing ones are updated); your current work is kept.`)) return;
+      libs.forEach((lib) => {
+        const i = state.masterLibraries.findIndex((m) => m.id === lib.id);
+        if (i >= 0) state.masterLibraries[i] = lib; else state.masterLibraries.push(lib);
+        if (loaded.layers && loaded.layers[lib.id]) state.working.layers[lib.id] = loaded.layers[lib.id];
+        ensureLayer(lib.id);
+      });
+      state.working.activeMasterId = libs[0].id;
+      migrate();
+      saveMasters(); saveWorking();
+      syncLibrary();
+      render();
+      renderSettings();
+      renderSetup();
+      flash(`Imported library “${names}”.`);
+    } catch (err) {
+      alert("Could not load library: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+function addSection(label) {
+  if (!requireDev()) return;
+  label = (label || "").trim();
+  if (!label) return;
+  activeMaster().sections.push({ id: crypto.randomUUID().slice(0, 8), label });
+  afterMasterEdit();
+}
+function renameSection(id, label) {
+  const s = activeMaster().sections.find((x) => x.id === id);
+  if (!s) return;
+  s.label = label;
+  saveMasters();   // light: don't full-rerender on every keystroke
+}
+function moveSection(id, dir) {
+  if (!requireDev()) return;
+  const arr = activeMaster().sections;
+  const i = arr.findIndex((s) => s.id === id);
+  const j = i + dir;
+  if (i === -1 || j < 0 || j >= arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  afterMasterEdit();
+}
+function deleteSection(id) {
+  if (!requireDev()) return;
+  if (activeMaster().requests.some((r) => r.section === id))
+    return alert("This section has requests. Move or delete them first.");
+  activeMaster().sections = activeMaster().sections.filter((s) => s.id !== id);
+  afterMasterEdit();
+}
+function addRequest() {
+  if (!requireDev()) return;
+  const title = $("#newReqTitle").value.trim();
+  const body = $("#newReqBody").value.trim();
+  const section = $("#newReqSection").value;
+  if (!title || !body) return alert("Title and request text are required.");
+  const groups = [...el.setupRequests.querySelectorAll("input[data-newreq-group]:checked")].map((c) => c.dataset.newreqGroup);
+  activeMaster().requests.push({ id: crypto.randomUUID().slice(0, 12), section, title, body, groups: groups.length ? groups : ["ea"] });
+  afterMasterEdit();
+}
+function saveRequest(id) {
+  const r = activeMaster().requests.find((x) => x.id === id);
+  if (!r) return;
+  r.title = el.setupRequests.querySelector(`[data-req-title="${id}"]`).value.trim() || r.title;
+  r.body = el.setupRequests.querySelector(`[data-req-body="${id}"]`).value;
+  r.section = el.setupRequests.querySelector(`[data-req-section="${id}"]`).value;
+  const groups = [...el.setupRequests.querySelectorAll(`input[data-req-group]:checked`)].map((c) => c.dataset.reqGroup);
+  r.groups = groups.length ? groups : ["ea"];
+  editingSetupReqId = null;
+  afterMasterEdit();
+  flash("System request saved");
+}
+function deleteRequest(id) {
+  if (!requireDev()) return;
+  if (!confirm("Delete this system request from the library?")) return;
+  activeMaster().requests = activeMaster().requests.filter((r) => r.id !== id);
+  afterMasterEdit();
+}
+
+// ---- misc ----
+function focusCard(id) {
+  if (mode !== "edit") return;
+  const card = el.letterBody.querySelector(`.card[data-id="${id}"]`);
+  if (!card) return;
+  card.classList.add("flash");
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  const ta = card.querySelector("textarea");
+  if (!ta || ta.readOnly) return;
+  ta.focus();
+  const m = /\[[^\]]+\]/.exec(ta.value);
+  if (m) ta.setSelectionRange(m.index, m.index + m[0].length);
+}
+
+function groupBy(items, getKey) {
+  const groups = new Map();
+  items.forEach((i) => { const k = getKey(i); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
+  return groups;
+}
+
+function letterGroups() {
+  const groups = groupBy(selected(), (i) => i.location);
+  return sections.filter((s) => groups.has(s.id))
+    .map((s) => ({ label: s.label, items: groups.get(s.id).map(displayText) }));
+}
+
+function letterText() {
+  const lines = [];
+  if (state.session.manuscript) lines.push(`Manuscript: ${state.session.manuscript}`, "");
+  lines.push(curIntro(), "");
+  letterGroups().forEach((g, i) => {
+    lines.push(`${i + 1}. ${g.label.toUpperCase()}`);
+    g.items.forEach((t) => lines.push(`- ${t}`));
+    lines.push("");
+  });
+  return lines.join("\n").trimEnd();
+}
+
+// Build the export base name and bump 2,3,... on repeat (no overlap).
+function exportBase() {
+  const base = (state.session.manuscript.trim() ? `${state.session.manuscript.trim()} ` : "") + "Author Checklist";
+  if (state.session.exportName !== base) { state.session.exportName = base; state.session.exportCount = 1; }
+  else state.session.exportCount += 1;
+  const suffix = state.session.exportCount > 1 ? ` ${state.session.exportCount}` : "";
+  saveSession();
+  return base + suffix;
+}
+
+// Guard exports when the Manuscript Number is blank.
+function confirmExport() {
+  if (state.session.manuscript.trim()) return true;
+  return confirm("No Manuscript Number set. Export anyway?");
+}
+
+let flashTimer;
+function flash(msg) {
+  el.footInfo.textContent = msg;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(updateFoot, 2500);
+}
+
+function escapeHtml(v) {
+  return String(v).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+function setPdfCollapsed(on) {
+  document.querySelector(".workspace").classList.toggle("pdf-collapsed", on);
+  el.pdfExpandBtn.hidden = !on;
+}
+
+function syncLock() {
+  const locked = mode === "preview" ? state.settings.structuredLocked : state.settings.letterLocked;
+  el.lockToggle.checked = locked;
+  el.lockLabel.textContent = (locked ? "🔒" : "🔓") + " Locked";
+  el.orderBtn.hidden = mode !== "edit";
+}
+
+function setChecklistView(next) {
+  checklistView = next;
+  $("#viewSectionsBtn").classList.toggle("active", next === "sections");
+  $("#viewQuickBtn").classList.toggle("active", next === "quick");
+  el.customBox.hidden = next === "quick";   // no custom field in quick view
+  renderChecklist();
+}
+
+function setMode(next) {
+  mode = next;
+  $("#editModeBtn").classList.toggle("active", next === "edit");
+  $("#previewModeBtn").classList.toggle("active", next === "preview");
+  syncLock();
+  renderLetter();
+}
+
+// ---- events ----
+function wire() {
+  el.tabbar.addEventListener("click", (e) => {
+    const cb = e.target.closest(".tab-active");
+    if (cb) {
+      e.stopPropagation();
+      if (!requireDev()) { cb.checked = state.settings.activeChecklists[cb.dataset.tab]; return; }
+      state.settings.activeChecklists[cb.dataset.tab] = cb.checked;
+      saveSettings();
+      renderChecklist();
+      return;
+    }
+    const tab = e.target.closest(".tab");
+    if (!tab) return;
+    state.session.activeTab = tab.dataset.tab;
+    saveSession();
+    renderTabs();
+    renderChecklist();
+  });
+
+  el.categoryList.addEventListener("change", (e) => {
+    const input = e.target.closest("input[type='checkbox']");
+    if (!input) return;
+    input.checked ? addById(input.dataset.id) : removeSelected(input.dataset.id);
+  });
+  el.categoryList.addEventListener("click", (e) => {
+    const q = e.target.closest(".quick-title");
+    if (!q) return;
+    const body = el.categoryList.querySelector(`.quick-body[data-body="${q.dataset.desc}"]`);
+    if (!body) return;
+    body.hidden = !body.hidden;
+    body.hidden ? openQuick.delete(q.dataset.desc) : openQuick.add(q.dataset.desc);
+  });
+  el.categoryList.addEventListener("toggle", (e) => {
+    const d = e.target.closest("details.category");
+    if (!d) return;
+    d.open ? openSections.add(d.dataset.section) : openSections.delete(d.dataset.section);
+  }, true);
+
+  el.letterBody.addEventListener("input", (e) => {
+    const ti = e.target.closest("input[data-title]");
+    if (ti) {
+      const item = selected().find((x) => x.id === ti.dataset.title);
+      if (item) { item.title = ti.value; saveSession(); }
+      return;
+    }
+    const ta = e.target.closest("textarea[data-edit]");
+    if (!ta) return;
+    const item = selected().find((x) => x.id === ta.dataset.edit);
+    if (!item) return;
+    item.customText = ta.value;
+    item.useOriginal = false;
+    item.savedToLibrary = false;
+    saveSession();
+    updateFoot();
+  });
+  el.letterBody.addEventListener("click", (e) => {
+    const tg = e.target.closest("button[data-toggle]");
+    if (tg) {
+      const id = tg.dataset.toggle;
+      const item = selected().find((x) => x.id === id);
+      if (item && isCardOpen(item)) {            // collapse
+        collapsedCards.add(id);
+        if (openCardId() === id) expandedCardId = "__none__";
+      } else {                                   // expand
+        collapsedCards.delete(id);
+        expandedCardId = id;
+      }
+      return renderLetter();
+    }
+    const rm = e.target.closest("button[data-remove]"); if (rm) return removeSelected(rm.dataset.remove);
+    const mv = e.target.closest("button[data-move]"); if (mv) return move(mv.dataset.id, mv.dataset.move === "up" ? -1 : 1);
+    const sv = e.target.closest("button[data-savelib]"); if (sv) return saveSelectedToLibrary(sv.dataset.savelib);
+  });
+  el.letterBody.addEventListener("change", (e) => {
+    const cf = e.target.closest("input[data-confirm]");
+    if (cf) {
+      const item = selected().find((x) => x.id === cf.dataset.confirm);
+      if (item) { item.customConfirmed = cf.checked; saveSession(); renderLetter(); }
+      return;
+    }
+    const orig = e.target.closest("input[data-orig]");
+    if (!orig) return;
+    const item = selected().find((x) => x.id === orig.dataset.orig);
+    if (!item) return;
+    item.useOriginal = orig.checked;
+    saveSession();
+    renderLetter();
+  });
+
+  el.lockToggle.addEventListener("change", () => {
+    if (mode === "preview") state.settings.structuredLocked = el.lockToggle.checked;
+    else state.settings.letterLocked = el.lockToggle.checked;
+    saveSettings();
+    renderLetter();
+  });
+  el.undoBtn.addEventListener("click", undoRemoval);
+
+  el.manuscriptInput.addEventListener("input", () => {
+    state.session.manuscript = el.manuscriptInput.value;
+    saveSession();
+    renderLetter();
+  });
+
+  $("#addCustomBtn").addEventListener("click", addCustom);
+  $("#viewSectionsBtn").addEventListener("click", () => setChecklistView("sections"));
+  $("#viewQuickBtn").addEventListener("click", () => setChecklistView("quick"));
+  $("#editModeBtn").addEventListener("click", () => setMode("edit"));
+  $("#previewModeBtn").addEventListener("click", () => setMode("preview"));
+  el.orderBtn.addEventListener("click", orderCards);
+  el.devBtn.addEventListener("click", toggleDev);
+  el.settingsDevBtn.addEventListener("click", toggleDev);
+  el.setupDevBtn.addEventListener("click", toggleDev);
+
+  // ⚠ on the DOCX button: jump to the first request still needing entry, don't trigger an export.
+  el.docxWarn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const item = selected().find((i) => itemNeedsCustom(i) && !i.customConfirmed);
+    if (!item) return;
+    if (mode !== "edit") setMode("edit");
+    collapsedCards.delete(item.id);
+    expandedCardId = item.id;
+    renderLetter();
+    focusCard(item.id);
+  });
+
+  // Settings overlay
+  $("#settingsBtn").addEventListener("click", () => { renderSettings(); el.settingsScreen.hidden = false; });
+  $("#settingsCloseBtn").addEventListener("click", () => { el.settingsScreen.hidden = true; });
+  el.settingsList.addEventListener("change", (e) => {
+    const cb = e.target.closest("input[data-default]");
+    if (cb) {
+      if (!requireDev()) { cb.checked = L().preselected.includes(cb.dataset.default); return; }
+      const set = new Set(L().preselected);
+      cb.checked ? set.add(cb.dataset.default) : set.delete(cb.dataset.default);
+      L().preselected = [...set];
+      saveWorking();
+      return;
+    }
+    const tag = e.target.closest("input[data-tag]");
+    if (tag) {
+      if (!requireDev()) return renderSettings();
+      setTag(tag.dataset.tag, tag.dataset.group, tag.checked);
+    }
+  });
+  el.settingsList.addEventListener("click", (e) => {
+    const edit = e.target.closest("[data-editrow]"); if (edit) return startEditSetting(edit.dataset.editrow);
+    const save = e.target.closest("[data-save]"); if (save) return saveEditSetting(save.dataset.save);
+    const rev = e.target.closest("[data-revert]"); if (rev) return revertSetting(rev.dataset.revert);
+    if (e.target.closest("[data-canceledit]")) { editingSettingId = null; return renderSettings(); }
+    const del = e.target.closest("[data-del]"); if (del) return deleteSetting(del.dataset.del, del.dataset.lib === "1");
+    const res = e.target.closest("[data-restore]"); if (res) return restoreSetting(res.dataset.restore);
+  });
+
+  el.introText.addEventListener("input", () => {
+    if (!devUnlocked) return;
+    L().introOverride = el.introText.value;
+    saveWorking();
+    if (mode === "preview") renderLetter();
+  });
+  el.introRevertBtn.addEventListener("click", () => {
+    if (!requireDev()) return;
+    L().introOverride = null;                 // fall back to this library's default intro
+    saveWorking();
+    el.introText.value = curIntro();
+    if (mode === "preview") renderLetter();
+  });
+
+  // Setup overlay
+  $("#setupBtn").addEventListener("click", () => { el.setupScreen.hidden = false; renderSetup(); });
+  $("#setupCloseBtn").addEventListener("click", () => { el.setupScreen.hidden = true; editingSetupReqId = null; });
+  el.setupIntro.addEventListener("input", () => {
+    if (!devUnlocked) return;
+    activeMaster().intro = el.setupIntro.value;
+    saveMasters();
+    if (mode === "preview" && L().introOverride == null) renderLetter();
+  });
+  el.setupLibs.addEventListener("change", (e) => {
+    const act = e.target.closest("input[data-activate]");
+    if (act) return setActiveMaster(act.dataset.activate);
+  });
+  el.setupLibs.addEventListener("click", (e) => {
+    const ren = e.target.closest("[data-renamelib]"); if (ren) return renameLibrary(ren.dataset.renamelib);
+    const dup = e.target.closest("[data-duplib]"); if (dup) return duplicateLibrary(dup.dataset.duplib);
+    const del = e.target.closest("[data-dellib]"); if (del) return deleteLibrary(del.dataset.dellib);
+    if (e.target.closest("[data-newlib]")) return newLibrary();
+  });
+  el.exportLibBtn.addEventListener("click", exportLibrary);
+  el.importLibInput.addEventListener("change", (e) => {
+    if (e.target.files[0]) importLibrary(e.target.files[0]);
+    e.target.value = "";
+  });
+  el.setupSections.addEventListener("input", (e) => {
+    const nm = e.target.closest("input[data-secname]");
+    if (nm) renameSection(nm.dataset.secname, nm.value);
+  });
+  el.setupSections.addEventListener("click", (e) => {
+    const up = e.target.closest("[data-secup]"); if (up) return moveSection(up.dataset.secup, -1);
+    const dn = e.target.closest("[data-secdown]"); if (dn) return moveSection(dn.dataset.secdown, 1);
+    const del = e.target.closest("[data-secdel]"); if (del) return deleteSection(del.dataset.secdel);
+    if (e.target.closest("[data-addsec]")) return addSection($("#newSectionName").value);
+  });
+  el.setupRequests.addEventListener("click", (e) => {
+    const ed = e.target.closest("[data-reqedit]"); if (ed) { if (!requireDev()) return; editingSetupReqId = ed.dataset.reqedit; return renderSetup(); }
+    const sv = e.target.closest("[data-reqsave]"); if (sv) return saveRequest(sv.dataset.reqsave);
+    if (e.target.closest("[data-reqcancel]")) { editingSetupReqId = null; return renderSetup(); }
+    const del = e.target.closest("[data-reqdel]"); if (del) return deleteRequest(del.dataset.reqdel);
+    if (e.target.closest("[data-addreq]")) return addRequest();
+  });
+
+  el.pdfCollapseBtn.addEventListener("click", () => setPdfCollapsed(true));
+  el.pdfExpandBtn.addEventListener("click", () => setPdfCollapsed(false));
+
+  $("#seedBtn").addEventListener("click", () => {
+    if (!requireDev()) return;
+    if (!confirm("Reset selected requests to the preselected set, and clear the Manuscript Number? (Your libraries are kept.)")) return;
+    resetSnapshot = structuredClone(state.session);   // whole-session snapshot for "Undo reset"
+    state.session.selected = [];
+    state.session.manuscript = "";
+    state.session.exportName = "";
+    state.session.exportCount = 0;
+    el.manuscriptInput.value = "";
+    undoStack = [];
+    expandedCardId = null;
+    collapsedCards.clear();
+    applyDefaults();
+    saveSession();
+    render();
+  });
+
+  el.undoResetBtn.addEventListener("click", () => {
+    if (!resetSnapshot) return;
+    state.session = resetSnapshot;
+    resetSnapshot = null;
+    el.manuscriptInput.value = state.session.manuscript || "";
+    saveSession();
+    render();
+  });
+
+  $("#copyBtn").addEventListener("click", async () => {
+    if (!selected().length) return flash("Nothing to copy yet.");
+    await navigator.clipboard.writeText(letterText());
+    flash("Letter copied.");
+  });
+
+  // Working file — the resumable bundle: stop mid-assessment, reopen later (even on
+  // another computer) and continue. Libraries are included so it opens correctly there.
+  $("#exportBtn").addEventListener("click", async () => {
+    if (!confirmExport()) return;
+    const name = exportBase();
+    const snapshot = { kind: "working", session: state.session, masterLibraries: state.masterLibraries, working: state.working, settings: state.settings, savedAt: new Date().toISOString() };
+    await store.saveChecklist(name, snapshot);                       // archive/checklists/<name>.json (server only)
+    store.triggerDownload(new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" }), name + ".json");
+    flash(`Saved working file “${name}”.`);
+  });
+
+  $("#docxBtn").addEventListener("click", async () => {
+    if (!selected().length) return flash("Nothing to export yet.");
+    if (!confirmExport()) return;
+    const warnN = selected().filter((i) => itemNeedsCustom(i) && !i.customConfirmed).length;
+    if (warnN && !confirm(`${warnN} request(s) needing customisation are not marked done. Export anyway?`)) return;
+    const name = exportBase();
+    await store.exportDocx(name, name, letterGroups(), curIntro());
+    flash(`DOCX exported: ${name}.docx`);
+  });
+
+  // Open working file — restore a saved session and continue where it stopped.
+  el.importInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const loaded = JSON.parse(reader.result);
+        if (loaded.kind === "library") throw new Error("that's a library file — load it via Setup ▸ Import library");
+        const sess = loaded.session || loaded;          // accept snapshot or raw state
+        if (!Array.isArray(sess.selected)) throw new Error("not a working file");
+        if (!confirm("Open this working file? It replaces your current in-progress checklist.")) return;
+        state.session = sess;
+        if (Array.isArray(loaded.masterLibraries) && loaded.masterLibraries.length) state.masterLibraries = loaded.masterLibraries;
+        if (loaded.working) state.working = loaded.working;
+        if (loaded.settings) state.settings = loaded.settings;
+        migrate();
+        undoStack = [];
+        resetSnapshot = null;
+        collapsedCards.clear();
+        saveSession(); saveWorking(); saveMasters(); saveSettings();
+        el.manuscriptInput.value = state.session.manuscript || "";
+        render();
+        flash("Loaded.");
+      } catch (err) {
+        alert("Could not load file: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  $("#pdfInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    $("#pdfFrame").innerHTML = `<object data="${URL.createObjectURL(file)}" type="application/pdf"></object>`;
+  });
+
+  el.searchInput.addEventListener("input", renderChecklist);
+
+  // Mouse-first tool, light keyboard help: / search, ↑↓ move between checks, space/enter toggle, esc close.
+  document.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const inField = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+    if (e.key === "Escape") {
+      if (!el.setupScreen.hidden) { el.setupScreen.hidden = true; return; }
+      if (!el.settingsScreen.hidden) { el.settingsScreen.hidden = true; return; }
+      if (inField) { e.target.blur(); return; }
+      return;
+    }
+    if (e.key === "/" && !inField) { e.preventDefault(); el.searchInput.focus(); el.searchInput.select(); return; }
+    // only visible checks (those in open sections / quick list) are focusable
+    const boxes = [...el.categoryList.querySelectorAll("input[type='checkbox'][data-id]")].filter((b) => b.offsetParent !== null);
+    if ((e.key === "ArrowDown" || e.key === "ArrowUp") && boxes.length) {
+      const i = boxes.indexOf(document.activeElement);
+      if (i === -1) { if (!inField) { e.preventDefault(); boxes[0].focus(); } return; }
+      e.preventDefault();
+      boxes[(i + (e.key === "ArrowDown" ? 1 : -1) + boxes.length) % boxes.length].focus();
+      return;
+    }
+    if (e.key === "Enter" && document.activeElement?.matches?.("input[type='checkbox'][data-id]")) {
+      e.preventDefault();
+      document.activeElement.click();   // space already toggles natively
+    }
+  });
+}
+
+// ---- init ----
+async function init() {
+  el = {
+    categoryList: $("#categoryList"), letterBody: $("#letterBody"), customText: $("#customText"),
+    customTitle: $("#customTitle"),
+    customLocation: $("#customLocation"), customSaveLib: $("#customSaveLib"), searchInput: $("#searchInput"),
+    customBox: $("#customBox"), docxWarn: $("#docxWarn"),
+    manuscriptInput: $("#manuscriptInput"), tabbar: $("#tabbar"), lockToggle: $("#lockToggle"),
+    lockLabel: $("#lockLabel"),
+    footInfo: $("#footInfo"), undoBtn: $("#undoBtn"), undoResetBtn: $("#undoResetBtn"), devBtn: $("#devBtn"),
+    orderBtn: $("#orderBtn"), settingsDevBtn: $("#settingsDevBtn"),
+    settingsScreen: $("#settingsScreen"), settingsList: $("#settingsList"), settingsLockNote: $("#settingsLockNote"),
+    introText: $("#introText"), introRevertBtn: $("#introRevertBtn"),
+    setupScreen: $("#setupScreen"), setupDevBtn: $("#setupDevBtn"), setupLockNote: $("#setupLockNote"),
+    setupLibs: $("#setupLibs"), setupIntro: $("#setupIntro"), setupSections: $("#setupSections"), setupRequests: $("#setupRequests"),
+    exportLibBtn: $("#exportLibBtn"), importLibInput: $("#importLibInput"),
+    pdfCollapseBtn: $("#pdfCollapseBtn"), pdfExpandBtn: $("#pdfExpandBtn"),
+    importInput: $("#importInput")
+  };
+  const loaded = await store.loadStores(defaults());
+  state = loaded;
+  if (!state.masterLibraries.length) migrateToLibraries();   // first run: build the foundation from code
+  migrate();
+  saveMasters(); saveWorking(); saveSettings();   // persist whatever migrate() just normalised
+  syncLibrary();
+  if (!selected().length) applyDefaults();
+  el.manuscriptInput.value = state.session.manuscript || "";
+  updateDevButton();
+  wire();
+  render();
+}
+
+// Surface startup failures instead of dying silently — a silent throw here looks
+// like "the page loads but no button works" (init wires every click at its end).
+init().catch((err) => {
+  console.error(err);
+  const b = document.createElement("div");
+  b.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#b00020;color:#fff;font:14px/1.4 system-ui;padding:10px 14px";
+  b.textContent = "This tool couldn't start in this browser (" + (err && err.message ? err.message : err) +
+    "). Please open it in an up-to-date Chrome or Edge.";
+  document.body.appendChild(b);
+});
+
+</script>
+  </body>
+</html>
