@@ -16,6 +16,10 @@ const TABS = [
 ];
 const SEED_PRESELECTED = ["section_order", "affiliation_check"];   // used only for a brand-new seeded library
 const UNDO_MAX = 5;
+// Roles declutter the UI (Setup is Director-only, default tab matches the checklist you
+// run). They are NOT security — this is a client-side app, none is possible.
+const ROLE_LABELS = { director: "Director", editor: "Editor", ea: "Assistant Editor" };
+const ROLE_TAB = { director: "all", editor: "editor", ea: "ea" };   // default tab per role
 const GROUP_IDS = ["ea", "editor"];                            // taggable checklist memberships
 const GROUP_LABELS = { ea: "EA", editor: "Editor" };
 // "Reporting Summary" used to be a tab (an audience); it is now a SECTION.
@@ -33,7 +37,7 @@ function defaults() {
       letterLocked: true,
       structuredLocked: true,
       activeChecklists: { ea: true, editor: true },
-      devPassword: ""
+      role: null   // director | editor | ea — picked on first run
     },
     session: { manuscript: "", activeTab: "all", selected: [], exportName: "", exportCount: 0 },
     masterLibraries: [],
@@ -43,7 +47,6 @@ function defaults() {
 
 let state = defaults();
 let mode = "edit";
-let devUnlocked = false;
 let undoStack = [];
 let resetSnapshot = null;             // whole-session snapshot taken on Reset, for "Undo reset"
 let editingSettingId = null;          // settings row currently open for inline text editing
@@ -109,7 +112,7 @@ function migrateToLibraries() {
     letterLocked: typeof old.letterLocked === "boolean" ? old.letterLocked : true,
     structuredLocked: typeof old.structuredLocked === "boolean" ? old.structuredLocked : true,
     activeChecklists: old.activeChecklists || { ea: true, editor: true },
-    devPassword: old.devPassword || ""
+    role: old.role || null
   };
   state.library = [];
   saveMasters(); saveWorking(); saveSettings();
@@ -137,7 +140,8 @@ function migrate() {
   const s = state.settings;
   if (typeof s.letterLocked !== "boolean") s.letterLocked = true;
   if (typeof s.structuredLocked !== "boolean") s.structuredLocked = true;
-  s.devPassword ||= "";
+  delete s.devPassword;                                   // retired soft lock (replaced by roles)
+  if (!ROLE_LABELS[s.role]) s.role = null;                // unknown role → re-pick on load
   s.activeChecklists ||= { ea: true, editor: true };
   delete s.activeChecklists.reporting;
   state.session.selected ||= [];
@@ -385,36 +389,27 @@ function orderCards() {
   renderLetter();
 }
 
-// ---- dev mode (soft protection) ----
-function toggleDev() {
-  if (devUnlocked) { devUnlocked = false; updateDevButton(); renderSettings(); renderSetup(); return; }
-  const pw = state.settings.devPassword;
-  if (!pw) {
-    const set = prompt("Set a developer password (soft lock — not encrypted):");
-    if (set == null) return;
-    if (set !== prompt("Confirm password:")) return alert("Passwords did not match.");
-    state.settings.devPassword = set;
-    saveSettings();
-    devUnlocked = true;
-  } else {
-    if (prompt("Developer password:") !== pw) return alert("Wrong password.");
-    devUnlocked = true;
-  }
-  updateDevButton();
-  renderSettings();
-  renderSetup();
+// ---- roles (UI decluttering, not security) ----
+const isDirector = () => state.settings.role === "director";
+function applyRole() {
+  const r = state.settings.role;
+  el.roleBtn.textContent = "👤 " + (ROLE_LABELS[r] || "Choose role");
+  el.setupBtn.hidden = !isDirector();
 }
-function requireDev() {
-  if (devUnlocked) return true;
-  alert("Developer mode is locked. Unlock it (top bar) to change protected settings.");
-  return false;
+function openRolePicker() {
+  el.roleCloseBtn.hidden = !state.settings.role;   // first run: a role must be picked
+  el.roleScreen.hidden = false;
 }
-function updateDevButton() {
-  [el.devBtn, el.settingsDevBtn, el.setupDevBtn].forEach((b) => {
-    if (!b) return;
-    b.textContent = devUnlocked ? "🔓 Dev" : "🔒 Dev";
-    b.classList.toggle("on", devUnlocked);
-  });
+function setRole(role) {
+  if (!ROLE_LABELS[role]) return;
+  state.settings.role = role;
+  saveSettings();
+  state.session.activeTab = ROLE_TAB[role];
+  saveSession();
+  el.roleScreen.hidden = true;
+  if (!isDirector()) el.setupScreen.hidden = true;
+  applyRole();
+  render();
 }
 
 // ---- render ----
@@ -438,8 +433,8 @@ function tabFlagged(id) {
 function renderTabs() {
   el.tabbar.innerHTML = TABS.map((tab) => {
     const active = state.session.activeTab === tab.id ? "active" : "";
-    const toggle = tab.real
-      ? `<input type="checkbox" class="tab-active" data-tab="${tab.id}" ${state.settings.activeChecklists[tab.id] ? "checked" : ""} title="Activate checklist (Dev)">`
+    const toggle = tab.real && isDirector()
+      ? `<input type="checkbox" class="tab-active" data-tab="${tab.id}" ${state.settings.activeChecklists[tab.id] ? "checked" : ""} title="Activate checklist">`
       : "";
     const n = tabFlagged(tab.id);
     const badge = n ? `<span class="tab-flagged" title="${n} flagged">${n}</span>` : "";
@@ -458,7 +453,7 @@ function renderChecklist() {
   const tab = state.session.activeTab;
 
   if (GROUP_IDS.includes(tab) && !state.settings.activeChecklists[tab]) {
-    el.categoryList.innerHTML = `<div class="empty-state">Checklist “${TABS.find((t) => t.id === tab).label}” is off. Tick its box in the tab bar (Dev mode) to activate.</div>`;
+    el.categoryList.innerHTML = `<div class="empty-state">Checklist “${TABS.find((t) => t.id === tab).label}” is off. ${isDirector() ? "Tick its box in the tab bar to activate." : "Switch to the Director role (top bar) to activate it."}</div>`;
     return;
   }
 
@@ -590,7 +585,6 @@ function updateFoot() {
 
 // ---- Settings overlay (personal layer) ----
 function settingsRow({ id, title, rawTitle, body, groups, fromLib, edited }) {
-  const dis = !devUnlocked ? "disabled" : "";
   if (editingSettingId === id) {
     return `<div class="settings-row editing">
       <input class="settings-edit-title" type="text" data-edit-title="${id}" value="${escapeHtml(rawTitle ?? title)}" placeholder="Title">
@@ -603,21 +597,18 @@ function settingsRow({ id, title, rawTitle, body, groups, fromLib, edited }) {
   }
   const on = L().preselected.includes(id);
   const tags = GROUP_IDS.map((g) => `<label class="tag-check"><input type="checkbox" data-tag="${id}" data-group="${g}"
-    ${groups.includes(g) ? "checked" : ""} ${dis}> ${GROUP_LABELS[g]}</label>`).join("");
+    ${groups.includes(g) ? "checked" : ""}> ${GROUP_LABELS[g]}</label>`).join("");
   return `<div class="settings-row">
-    <label class="settings-default"><input type="checkbox" data-default="${id}" ${on ? "checked" : ""} ${dis}> preselected</label>
+    <label class="settings-default"><input type="checkbox" data-default="${id}" ${on ? "checked" : ""}> preselected</label>
     <button type="button" class="settings-name" data-editrow="${id}" title="${escapeHtml(body)}">${escapeHtml(title)}${edited ? ' <span class="tag custom-flag">adapted</span>' : ""}</button>
     <span class="settings-tags">${tags}</span>
-    <button type="button" class="settings-del" data-del="${id}" data-lib="${fromLib ? 1 : 0}" ${dis} title="${fromLib ? "Delete this custom request" : "Hide this system request (can be restored)"}">×</button>
+    <button type="button" class="settings-del" data-del="${id}" data-lib="${fromLib ? 1 : 0}" title="${fromLib ? "Delete this custom request" : "Hide this system request (can be restored)"}">×</button>
   </div>`;
 }
 
 function renderSettings() {
   if (!el.settingsList) return;
-  el.settingsLockNote.hidden = devUnlocked;
   el.introText.value = curIntro();
-  el.introText.disabled = !devUnlocked;
-  el.introRevertBtn.disabled = !devUnlocked;
   let html = sections.map((section) => {
     const items = templates.filter((t) => t.section === section.id && !isHidden(t.id));
     if (!items.length) return "";
@@ -634,15 +625,14 @@ function renderSettings() {
   if (hidden.length) {
     html += `<div class="settings-group"><h4>Hidden system requests</h4>${
       hidden.map((t) => `<div class="settings-row"><span class="settings-name struck">${escapeHtml(t.title)}</span>
-        <button type="button" data-restore="${t.id}" ${devUnlocked ? "" : "disabled"}>Restore</button></div>`).join("")
+        <button type="button" data-restore="${t.id}">Restore</button></div>`).join("")
     }</div>`;
   }
   el.settingsList.innerHTML = html;
 }
 
-// Inline personal-layer editing (Settings). All dev-gated.
+// Inline personal-layer editing (Settings) — each user's own layer, never locked.
 function startEditSetting(id) {
-  if (!requireDev()) return;
   editingSettingId = id;
   renderSettings();
   const ta = el.settingsList.querySelector(`textarea[data-edit-id="${id}"]`);
@@ -680,7 +670,6 @@ function revertSetting(id) {
   flash("Reverted to system text");
 }
 function deleteSetting(id, fromLib) {
-  if (!requireDev()) return;
   if (fromLib) {
     if (!confirm("Delete this custom request from your library?")) return;
     L().personalRequests = L().personalRequests.filter((e) => e.id !== id);
@@ -694,7 +683,6 @@ function deleteSetting(id, fromLib) {
   renderChecklist();
 }
 function restoreSetting(id) {
-  if (!requireDev()) return;
   L().hidden = L().hidden.filter((x) => x !== id);
   saveWorking();
   renderSettings();
@@ -709,7 +697,6 @@ function groupChecksHtml(selectedGroups, attr) {
 
 function renderSetup() {
   if (!el.setupScreen || el.setupScreen.hidden) return;
-  el.setupLockNote.hidden = devUnlocked;
   const m = activeMaster();
   // Library picker
   el.setupLibs.innerHTML = state.masterLibraries.map((lib) =>
@@ -717,28 +704,26 @@ function renderSetup() {
       <label><input type="radio" name="activeLib" data-activate="${lib.id}" ${lib.id === m.id ? "checked" : ""}> <strong>${escapeHtml(lib.name)}</strong></label>
       <span class="muted">${(lib.requests || []).length} requests · ${(lib.sections || []).length} sections</span>
       <span class="setup-lib-actions">
-        <button type="button" data-renamelib="${lib.id}" ${devUnlocked ? "" : "disabled"}>Rename</button>
-        <button type="button" data-duplib="${lib.id}" ${devUnlocked ? "" : "disabled"}>Duplicate</button>
-        <button type="button" data-dellib="${lib.id}" ${devUnlocked && state.masterLibraries.length > 1 ? "" : "disabled"}>Delete</button>
+        <button type="button" data-renamelib="${lib.id}">Rename</button>
+        <button type="button" data-duplib="${lib.id}">Duplicate</button>
+        <button type="button" data-dellib="${lib.id}" ${state.masterLibraries.length > 1 ? "" : "disabled"}>Delete</button>
       </span>
     </div>`).join("") +
-    `<div class="setup-add"><button type="button" data-newlib="1" ${devUnlocked ? "" : "disabled"}>+ New empty library (start from 0)</button></div>`;
+    `<div class="setup-add"><button type="button" data-newlib="1">+ New empty library (start from 0)</button></div>`;
 
   // Intro (chief-editor default for this library)
   el.setupIntro.value = m.intro ?? DEFAULT_INTRO;
-  el.setupIntro.disabled = !devUnlocked;
 
   // Sections
-  const dis = devUnlocked ? "" : "disabled";
   el.setupSections.innerHTML = (m.sections || []).map((s, i) =>
     `<div class="setup-section-row">
-      <input type="text" data-secname="${s.id}" value="${escapeHtml(s.label)}" ${dis}>
-      <button type="button" data-secup="${s.id}" ${dis || (i === 0 ? "disabled" : "")}>↑</button>
-      <button type="button" data-secdown="${s.id}" ${dis || (i === m.sections.length - 1 ? "disabled" : "")}>↓</button>
-      <button type="button" data-secdel="${s.id}" ${dis}>×</button>
+      <input type="text" data-secname="${s.id}" value="${escapeHtml(s.label)}">
+      <button type="button" data-secup="${s.id}" ${i === 0 ? "disabled" : ""}>↑</button>
+      <button type="button" data-secdown="${s.id}" ${i === m.sections.length - 1 ? "disabled" : ""}>↓</button>
+      <button type="button" data-secdel="${s.id}">×</button>
     </div>`).join("") +
-    `<div class="setup-add"><input id="newSectionName" type="text" placeholder="New section name" ${dis}>
-      <button type="button" data-addsec="1" ${dis}>Add section</button></div>`;
+    `<div class="setup-add"><input id="newSectionName" type="text" placeholder="New section name">
+      <button type="button" data-addsec="1">Add section</button></div>`;
 
   // System requests
   el.setupRequests.innerHTML = renderSetupRequests(m);
@@ -758,11 +743,10 @@ function setupReqRow(r) {
         <button type="button" data-reqcancel="1">Cancel</button>
       </div></div>`;
   }
-  const dis = devUnlocked ? "" : "disabled";
   return `<div class="settings-row">
     <button type="button" class="settings-name" data-reqedit="${r.id}" title="${escapeHtml(r.body)}">${escapeHtml(r.title)}</button>
     <span class="muted">${libGroups(r).map((g) => GROUP_LABELS[g]).join(", ")}</span>
-    <button type="button" class="settings-del" data-reqdel="${r.id}" ${dis} title="Delete this system request">×</button>
+    <button type="button" class="settings-del" data-reqdel="${r.id}" title="Delete this system request">×</button>
   </div>`;
 }
 
@@ -775,19 +759,18 @@ function renderSetupRequests(m) {
   const orphans = (m.requests || []).filter((r) => !(m.sections || []).some((s) => s.id === r.section));
   if (orphans.length) html += `<div class="settings-group"><h4>Unassigned (section removed)</h4>${orphans.map(setupReqRow).join("")}</div>`;
   // Add-new form
-  const dis = devUnlocked ? "" : "disabled";
   html += `<div class="settings-group setup-newreq"><h4>Add a system request</h4>
-    <input id="newReqTitle" type="text" placeholder="Title" ${dis}>
-    <textarea id="newReqBody" rows="3" placeholder="Request text. [bracketed] tokens become editor fill-ins." ${dis}></textarea>
+    <input id="newReqTitle" type="text" placeholder="Title">
+    <textarea id="newReqBody" rows="3" placeholder="Request text. [bracketed] tokens become editor fill-ins."></textarea>
     <div class="setup-req-meta">
-      <select id="newReqSection" ${dis}>${(m.sections || []).map((s) => `<option value="${s.id}">${escapeHtml(s.label)}</option>`).join("")}</select>
+      <select id="newReqSection">${(m.sections || []).map((s) => `<option value="${s.id}">${escapeHtml(s.label)}</option>`).join("")}</select>
       <span class="settings-tags">${groupChecksHtml(["ea"], "data-newreq-group")}</span>
-      <button type="button" data-addreq="1" ${dis}>Add</button>
+      <button type="button" data-addreq="1">Add</button>
     </div></div>`;
   return html;
 }
 
-// Master-library mutations (all dev-gated)
+// Master-library mutations (Setup is only reachable in the Director role)
 function setActiveMaster(id) {
   if (!state.masterLibraries.some((m) => m.id === id)) return;
   state.working.activeMasterId = id;
@@ -803,7 +786,6 @@ function afterMasterEdit() {
   renderSetup();
 }
 function newLibrary() {
-  if (!requireDev()) return;
   const name = (prompt("Name for the new (empty) library:", "New library") || "").trim();
   if (!name) return;
   const id = crypto.randomUUID();
@@ -816,7 +798,6 @@ function newLibrary() {
   renderSetup();
 }
 function renameLibrary(id) {
-  if (!requireDev()) return;
   const lib = state.masterLibraries.find((m) => m.id === id);
   if (!lib) return;
   const name = (prompt("Library name:", lib.name) || "").trim();
@@ -825,14 +806,12 @@ function renameLibrary(id) {
   afterMasterEdit();
 }
 function duplicateLibrary(id) {
-  if (!requireDev()) return;
   const lib = state.masterLibraries.find((m) => m.id === id);
   if (!lib) return;
   state.masterLibraries.push({ ...structuredClone(lib), id: crypto.randomUUID(), name: lib.name + " copy" });
   afterMasterEdit();
 }
 function deleteLibrary(id) {
-  if (!requireDev()) return;
   if (state.masterLibraries.length <= 1) return alert("Keep at least one library.");
   if (!confirm("Delete this library and its personal layer? This cannot be undone.")) return;
   state.masterLibraries = state.masterLibraries.filter((m) => m.id !== id);
@@ -890,7 +869,6 @@ function importLibrary(file) {
   reader.readAsText(file);
 }
 function addSection(label) {
-  if (!requireDev()) return;
   label = (label || "").trim();
   if (!label) return;
   activeMaster().sections.push({ id: crypto.randomUUID().slice(0, 8), label });
@@ -903,7 +881,6 @@ function renameSection(id, label) {
   saveMasters();   // light: don't full-rerender on every keystroke
 }
 function moveSection(id, dir) {
-  if (!requireDev()) return;
   const arr = activeMaster().sections;
   const i = arr.findIndex((s) => s.id === id);
   const j = i + dir;
@@ -912,14 +889,12 @@ function moveSection(id, dir) {
   afterMasterEdit();
 }
 function deleteSection(id) {
-  if (!requireDev()) return;
   if (activeMaster().requests.some((r) => r.section === id))
     return alert("This section has requests. Move or delete them first.");
   activeMaster().sections = activeMaster().sections.filter((s) => s.id !== id);
   afterMasterEdit();
 }
 function addRequest() {
-  if (!requireDev()) return;
   const title = $("#newReqTitle").value.trim();
   const body = $("#newReqBody").value.trim();
   const section = $("#newReqSection").value;
@@ -941,7 +916,6 @@ function saveRequest(id) {
   flash("System request saved");
 }
 function deleteRequest(id) {
-  if (!requireDev()) return;
   if (!confirm("Delete this system request from the library?")) return;
   activeMaster().requests = activeMaster().requests.filter((r) => r.id !== id);
   afterMasterEdit();
@@ -1046,7 +1020,6 @@ function wire() {
     const cb = e.target.closest(".tab-active");
     if (cb) {
       e.stopPropagation();
-      if (!requireDev()) { cb.checked = state.settings.activeChecklists[cb.dataset.tab]; return; }
       state.settings.activeChecklists[cb.dataset.tab] = cb.checked;
       saveSettings();
       renderChecklist();
@@ -1150,9 +1123,14 @@ function wire() {
   $("#editModeBtn").addEventListener("click", () => setMode("edit"));
   $("#previewModeBtn").addEventListener("click", () => setMode("preview"));
   el.orderBtn.addEventListener("click", orderCards);
-  el.devBtn.addEventListener("click", toggleDev);
-  el.settingsDevBtn.addEventListener("click", toggleDev);
-  el.setupDevBtn.addEventListener("click", toggleDev);
+
+  // Role picker — first-run overlay, reopened any time from the top bar.
+  el.roleBtn.addEventListener("click", openRolePicker);
+  el.roleCloseBtn.addEventListener("click", () => { el.roleScreen.hidden = true; });
+  el.roleScreen.addEventListener("click", (e) => {
+    const opt = e.target.closest("button[data-role]");
+    if (opt) setRole(opt.dataset.role);
+  });
 
   // ⚠ on the DOCX button: jump to the first request still needing entry, don't trigger an export.
   el.docxWarn.addEventListener("click", (e) => {
@@ -1172,7 +1150,6 @@ function wire() {
   el.settingsList.addEventListener("change", (e) => {
     const cb = e.target.closest("input[data-default]");
     if (cb) {
-      if (!requireDev()) { cb.checked = L().preselected.includes(cb.dataset.default); return; }
       const set = new Set(L().preselected);
       cb.checked ? set.add(cb.dataset.default) : set.delete(cb.dataset.default);
       L().preselected = [...set];
@@ -1180,10 +1157,7 @@ function wire() {
       return;
     }
     const tag = e.target.closest("input[data-tag]");
-    if (tag) {
-      if (!requireDev()) return renderSettings();
-      setTag(tag.dataset.tag, tag.dataset.group, tag.checked);
-    }
+    if (tag) setTag(tag.dataset.tag, tag.dataset.group, tag.checked);
   });
   el.settingsList.addEventListener("click", (e) => {
     const edit = e.target.closest("[data-editrow]"); if (edit) return startEditSetting(edit.dataset.editrow);
@@ -1195,13 +1169,11 @@ function wire() {
   });
 
   el.introText.addEventListener("input", () => {
-    if (!devUnlocked) return;
     L().introOverride = el.introText.value;
     saveWorking();
     if (mode === "preview") renderLetter();
   });
   el.introRevertBtn.addEventListener("click", () => {
-    if (!requireDev()) return;
     L().introOverride = null;                 // fall back to this library's default intro
     saveWorking();
     el.introText.value = curIntro();
@@ -1212,7 +1184,6 @@ function wire() {
   $("#setupBtn").addEventListener("click", () => { el.setupScreen.hidden = false; renderSetup(); });
   $("#setupCloseBtn").addEventListener("click", () => { el.setupScreen.hidden = true; editingSetupReqId = null; });
   el.setupIntro.addEventListener("input", () => {
-    if (!devUnlocked) return;
     activeMaster().intro = el.setupIntro.value;
     saveMasters();
     if (mode === "preview" && L().introOverride == null) renderLetter();
@@ -1243,7 +1214,7 @@ function wire() {
     if (e.target.closest("[data-addsec]")) return addSection($("#newSectionName").value);
   });
   el.setupRequests.addEventListener("click", (e) => {
-    const ed = e.target.closest("[data-reqedit]"); if (ed) { if (!requireDev()) return; editingSetupReqId = ed.dataset.reqedit; return renderSetup(); }
+    const ed = e.target.closest("[data-reqedit]"); if (ed) { editingSetupReqId = ed.dataset.reqedit; return renderSetup(); }
     const sv = e.target.closest("[data-reqsave]"); if (sv) return saveRequest(sv.dataset.reqsave);
     if (e.target.closest("[data-reqcancel]")) { editingSetupReqId = null; return renderSetup(); }
     const del = e.target.closest("[data-reqdel]"); if (del) return deleteRequest(del.dataset.reqdel);
@@ -1254,7 +1225,6 @@ function wire() {
   el.pdfExpandBtn.addEventListener("click", () => setPdfCollapsed(false));
 
   $("#seedBtn").addEventListener("click", () => {
-    if (!requireDev()) return;
     if (!confirm("Reset selected requests to the preselected set, and clear the Manuscript Number? (Your libraries are kept.)")) return;
     resetSnapshot = structuredClone(state.session);   // whole-session snapshot for "Undo reset"
     state.session.selected = [];
@@ -1321,7 +1291,9 @@ function wire() {
         state.session = sess;
         if (Array.isArray(loaded.masterLibraries) && loaded.masterLibraries.length) state.masterLibraries = loaded.masterLibraries;
         if (loaded.working) state.working = loaded.working;
-        if (loaded.settings) state.settings = loaded.settings;
+        // Keep the recipient's own role — a working file handed over by an EA
+        // must not turn the Editor's UI into an EA one.
+        if (loaded.settings) state.settings = { ...loaded.settings, role: state.settings.role };
         migrate();
         undoStack = [];
         resetSnapshot = null;
@@ -1351,6 +1323,7 @@ function wire() {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const inField = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
     if (e.key === "Escape") {
+      if (!el.roleScreen.hidden) { if (state.settings.role) el.roleScreen.hidden = true; return; }   // first run: must pick
       if (!el.setupScreen.hidden) { el.setupScreen.hidden = true; return; }
       if (!el.settingsScreen.hidden) { el.settingsScreen.hidden = true; return; }
       if (inField) { e.target.blur(); return; }
@@ -1382,11 +1355,12 @@ async function init() {
     customBox: $("#customBox"), docxWarn: $("#docxWarn"),
     manuscriptInput: $("#manuscriptInput"), tabbar: $("#tabbar"), lockToggle: $("#lockToggle"),
     lockLabel: $("#lockLabel"),
-    footInfo: $("#footInfo"), undoBtn: $("#undoBtn"), undoResetBtn: $("#undoResetBtn"), devBtn: $("#devBtn"),
-    orderBtn: $("#orderBtn"), settingsDevBtn: $("#settingsDevBtn"),
-    settingsScreen: $("#settingsScreen"), settingsList: $("#settingsList"), settingsLockNote: $("#settingsLockNote"),
+    footInfo: $("#footInfo"), undoBtn: $("#undoBtn"), undoResetBtn: $("#undoResetBtn"),
+    orderBtn: $("#orderBtn"),
+    roleBtn: $("#roleBtn"), roleScreen: $("#roleScreen"), roleCloseBtn: $("#roleCloseBtn"), setupBtn: $("#setupBtn"),
+    settingsScreen: $("#settingsScreen"), settingsList: $("#settingsList"),
     introText: $("#introText"), introRevertBtn: $("#introRevertBtn"),
-    setupScreen: $("#setupScreen"), setupDevBtn: $("#setupDevBtn"), setupLockNote: $("#setupLockNote"),
+    setupScreen: $("#setupScreen"),
     setupLibs: $("#setupLibs"), setupIntro: $("#setupIntro"), setupSections: $("#setupSections"), setupRequests: $("#setupRequests"),
     exportLibBtn: $("#exportLibBtn"), importLibInput: $("#importLibInput"),
     pdfCollapseBtn: $("#pdfCollapseBtn"), pdfExpandBtn: $("#pdfExpandBtn"),
@@ -1400,9 +1374,10 @@ async function init() {
   syncLibrary();
   if (!selected().length) applyDefaults();
   el.manuscriptInput.value = state.session.manuscript || "";
-  updateDevButton();
+  applyRole();
   wire();
   render();
+  if (!state.settings.role) openRolePicker();   // first run: pick a role before anything else
 }
 
 // Surface startup failures instead of dying silently — a silent throw here looks

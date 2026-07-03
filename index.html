@@ -53,9 +53,9 @@
           Open working file
         </label>
         <button id="docxBtn" type="button" title="Export the letter as a Word .docx (table per section)">Export DOCX <span id="docxWarn" class="docx-warn" hidden title="Some requests needing customisation are not marked done">⚠</span></button>
-        <button id="setupBtn" type="button" title="Library Setup — build the shared foundation (system requests)">Setup</button>
+        <button id="setupBtn" type="button" title="Library Setup — build the shared foundation (system requests)" hidden>Setup</button>
         <button id="settingsBtn" type="button" title="Your personal layer — preselected, tags, adaptations">Settings</button>
-        <button id="devBtn" type="button" title="Soft developer lock">🔒 Dev</button>
+        <button id="roleBtn" type="button" title="Your role — declutters the interface, switch any time">👤 Choose role</button>
         <button id="seedBtn" type="button" title="Reset selected requests to defaults">Reset</button>
       </div>
     </header>
@@ -135,12 +135,10 @@
         <div class="overlay-head">
           <h2>Settings — your working library</h2>
           <div class="overlay-head-actions">
-            <button id="settingsDevBtn" type="button" title="Soft developer lock">🔒 Dev</button>
             <button id="settingsCloseBtn" type="button">Close</button>
           </div>
         </div>
-        <p class="muted">This is <b>your</b> layer on top of the active library. Tick <b>preselected</b> to start a request selected on every reset. Tag <b>EA · Editor</b> to choose which checklist tabs show it. Click a request’s name to <b>adapt</b> its title and text for your field (system text can always be restored); use <b>×</b> to hide it. Your own one-off additions are <b>custom requests</b>. To change the shared foundation itself, use <b>Setup</b>.</p>
-        <p id="settingsLockNote" class="lock-note">🔒 Read-only. Unlock Dev mode (top bar) to change your preselected set or adapt request text.</p>
+        <p class="muted">This is <b>your</b> layer on top of the active library — it is never locked. Tick <b>preselected</b> to start a request selected on every reset. Tag <b>EA · Editor</b> to choose which checklist tabs show it. Click a request’s name to <b>adapt</b> its title and text for your field (system text can always be restored); use <b>×</b> to hide it. Your own one-off additions are <b>custom requests</b>. The shared foundation itself is changed in <b>Setup</b> (Director role).</p>
         <div class="settings-group intro-group">
           <h4>Letter introduction</h4>
           <div class="intro-head">
@@ -159,12 +157,10 @@
         <div class="overlay-head">
           <h2>Library Setup — the shared foundation</h2>
           <div class="overlay-head-actions">
-            <button id="setupDevBtn" type="button" title="Soft developer lock">🔒 Dev</button>
             <button id="setupCloseBtn" type="button">Close</button>
           </div>
         </div>
         <p class="muted">Build the journal-wide standard a chief editor hands to every editor: pick a <b>Master Library</b>, set its sections, and write its <b>system requests</b>. These are not personal customisations — for those, use <b>Settings</b>. Start a new library from 0 to stay journal-agnostic.</p>
-        <p id="setupLockNote" class="lock-note">🔒 Read-only. Unlock Dev mode (top bar) to author libraries.</p>
 
         <div class="settings-group">
           <h4>Master Libraries</h4>
@@ -191,6 +187,33 @@
         </div>
 
         <div id="setupRequests" class="settings-list"></div>
+      </div>
+    </div>
+
+    <!-- Role picker — shown on first run, reopened from the top bar -->
+    <div id="roleScreen" class="overlay" hidden>
+      <div class="overlay-card role-card">
+        <div class="overlay-head">
+          <h2>Choose your role</h2>
+          <div class="overlay-head-actions">
+            <button id="roleCloseBtn" type="button" hidden>Close</button>
+          </div>
+        </div>
+        <p class="muted">The role only declutters the interface — it shows the tools and checklist you work with. You can switch any time via the 👤 button in the top bar.</p>
+        <div class="role-options">
+          <button type="button" class="role-option" data-role="ea">
+            <strong>Assistant Editor</strong>
+            <span>Runs the first check pass with the EA checklist, then hands the working file to the Editor.</span>
+          </button>
+          <button type="button" class="role-option" data-role="editor">
+            <strong>Editor</strong>
+            <span>Completes the letter with the Editor checklist; adapts wording and keeps personal requests in Settings.</span>
+          </button>
+          <button type="button" class="role-option" data-role="director">
+            <strong>Director / Manager</strong>
+            <span>Authors the shared Master Library in Setup and distributes it as a library file.</span>
+          </button>
+        </div>
       </div>
     </div>
 

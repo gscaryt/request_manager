@@ -533,15 +533,17 @@ h2 {
 }
 
 .overlay[hidden] { display: none; } /* author display:grid otherwise beats the hidden attr */
-#devBtn.on { border-color: var(--green); color: var(--green); }
-.lock-note {
-  color: var(--amber);
-  background: var(--soft-amber);
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 12px;
-  margin-bottom: 10px;
+.role-card { width: min(520px, 100%); }
+.role-options { display: grid; gap: 10px; }
+.role-option {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 12px 14px;
 }
+.role-option strong { font-size: 14px; }
+.role-option span { color: var(--muted); font-size: 12px; }
+.role-option:hover { border-color: var(--blue); }
 .overlay {
   position: fixed;
   inset: 0;

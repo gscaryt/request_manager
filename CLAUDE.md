@@ -65,7 +65,7 @@ and all data stays on the user's computer.
 
 0. ✅ Git + GitHub Pages (live at gscaryt.github.io/request_manager).
 1. ✅ RS-tab → section; generic example seed; migrations.
-2. Role picker (Director/Editor/AE) replaces the Dev-password soft lock
+2. ✅ Role picker (Director/Editor/AE) replaces the Dev-password soft lock
    entirely; default tab + Setup visibility by role; Settings never locked.
 3. Top bar cleanup: Setup/Reset/role into a "⋯" menu; add "data is saved in
    this browser — keep a library file as backup" note.
