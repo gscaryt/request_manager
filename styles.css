@@ -385,6 +385,37 @@ h2 {
   color: #fff;
 }
 
+.letter-section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.letter-section summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  cursor: pointer;
+  background: #fafbfc;
+  font-weight: 700;
+}
+
+.letter-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.letter-section-body {
+  padding: 10px;
+}
+
+.letter-section-body .card:last-child {
+  margin-bottom: 0;
+}
+
 .card {
   border: 1px solid var(--line);
   border-left: 4px solid var(--green);

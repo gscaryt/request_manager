@@ -392,6 +392,37 @@ h2 {
   color: #fff;
 }
 
+.letter-section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.letter-section summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  cursor: pointer;
+  background: #fafbfc;
+  font-weight: 700;
+}
+
+.letter-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.letter-section-body {
+  padding: 10px;
+}
+
+.letter-section-body .card:last-child {
+  margin-bottom: 0;
+}
+
 .card {
   border: 1px solid var(--line);
   border-left: 4px solid var(--green);
@@ -1582,6 +1613,7 @@ let editingSettingId = null;          // settings row currently open for inline 
 let editingSetupReqId = null;         // setup system-request row open for inline editing
 let expandedCardId = null;            // Edit-stack card left open; others collapse ("__none__" = all collapsed)
 const collapsedCards = new Set();     // cards the user manually collapsed (override the needs-entry auto-expand)
+const letterSectionOpen = new Map();  // sectionId -> explicit open state, overrides the needs-entry auto-open default
 let checklistView = "sections";       // "sections" (collapsible) | "quick" (flat titles)
 const openSections = new Set();
 const openQuick = new Set();          // quick-list rows showing their description
@@ -1781,6 +1813,12 @@ const openCardId = () => expandedCardId ?? selected()[selected().length - 1]?.id
 const isCardOpen = (item) =>
   item.id === openCardId() ||
   (itemNeedsCustom(item) && !item.customConfirmed && !collapsedCards.has(item.id));
+// A letter section defaults open only while it holds an unconfirmed needs-entry card; the user's own
+// toggle (letterSectionOpen) overrides that default in either direction.
+function isLetterSectionOpen(sectionId, items) {
+  if (letterSectionOpen.has(sectionId)) return letterSectionOpen.get(sectionId);
+  return items.some((i) => itemNeedsCustom(i) && !i.customConfirmed);
+}
 
 // ---- mutations ----
 // Add by id from either store: system request or personal request.
@@ -2086,38 +2124,48 @@ function renderLetter() {
   }
 
   const locked = state.settings.letterLocked;
-  el.letterBody.innerHTML = heading + selected().map((item) => {
-    const section = sections.find((e) => e.id === item.location);
-    const edited = isEdited(item);
-    const collapsed = !isCardOpen(item);
-    const needsCustom = itemNeedsCustom(item);
-    return `<article class="card ${item.custom ? "custom" : ""} ${needsCustom ? "needs-entry" : ""} ${collapsed ? "collapsed" : ""}" data-id="${item.id}">
-      <div class="card-head">
-        <button class="card-toggle" type="button" data-toggle="${item.id}" title="${collapsed ? "Expand" : "Collapse"}">${collapsed ? "▸" : "▾"}</button>
-        <div class="card-headmain"><div class="card-titlerow">
-          <input class="card-title-input" type="text" data-title="${item.id}" value="${escapeHtml(item.title)}" ${locked ? "readonly" : ""}>
-          ${item.custom ? '<span class="tag">Custom</span>' : ""}</div>
-          <div class="meta">${escapeHtml(section?.label || "Other")} · ${item.custom ? "custom" : "system"}${item.savedToLibrary ? " · saved" : ""}</div></div>
-        <div class="card-actions">
-          ${needsCustom ? `<label class="custom-confirm ${item.customConfirmed ? "done" : ""}" title="Tick once you have filled in this request"><input type="checkbox" data-confirm="${item.id}" ${item.customConfirmed ? "checked" : ""}> needs entry</label>` : ""}
-          ${item.savedToLibrary ? "" : `<button class="ghost-btn icon-btn" type="button" data-savelib="${item.id}" title="Save to your library" aria-label="Save to your library">💾</button>`}
-          <button class="remove-btn icon-btn" type="button" data-remove="${item.id}" title="Remove" aria-label="Remove">✕</button></div>
-      </div>
-      <textarea rows="4" data-edit="${item.id}" ${locked ? "readonly" : ""}>${escapeHtml(displayText(item))}</textarea>
-      ${edited ? `<div class="original-box">
-        <div class="original-label">Journal original</div>
-        <div class="original-text">${escapeHtml(item.originalBody)}</div>
-        ${locked ? "" : `<button type="button" class="revert-btn" data-revertcard="${item.id}">Revert to journal original</button>`}
-      </div>` : ""}
-    </article>`;
+  const groups = groupBy(selected(), (i) => i.location);
+  el.letterBody.innerHTML = heading + sections.filter((s) => groups.has(s.id)).map((section) => {
+    const items = groups.get(section.id);
+    const open = isLetterSectionOpen(section.id, items);
+    const needsN = items.filter((i) => itemNeedsCustom(i) && !i.customConfirmed).length;
+    return `<details class="letter-section" data-section="${section.id}" ${open ? "open" : ""}>
+      <summary><span>${escapeHtml(section.label)}</span>
+        <span class="count">${needsN ? `<span class="flagged">${needsN} need${needsN === 1 ? "s" : ""} entry</span> · ` : ""}${items.length}</span></summary>
+      <div class="letter-section-body">${items.map((item) => {
+        const edited = isEdited(item);
+        const collapsed = !isCardOpen(item);
+        const needsCustom = itemNeedsCustom(item);
+        return `<article class="card ${item.custom ? "custom" : ""} ${needsCustom ? "needs-entry" : ""} ${collapsed ? "collapsed" : ""}" data-id="${item.id}">
+          <div class="card-head">
+            <button class="card-toggle" type="button" data-toggle="${item.id}" title="${collapsed ? "Expand" : "Collapse"}">${collapsed ? "▸" : "▾"}</button>
+            <div class="card-headmain"><div class="card-titlerow">
+              <input class="card-title-input" type="text" data-title="${item.id}" value="${escapeHtml(item.title)}" ${locked ? "readonly" : ""}>
+              ${item.custom ? '<span class="tag">Custom</span>' : ""}</div>
+              <div class="meta">${item.custom ? "custom" : "system"}${item.savedToLibrary ? " · saved" : ""}</div></div>
+            <div class="card-actions">
+              ${needsCustom ? `<label class="custom-confirm ${item.customConfirmed ? "done" : ""}" title="Tick once you have filled in this request"><input type="checkbox" data-confirm="${item.id}" ${item.customConfirmed ? "checked" : ""}> needs entry</label>` : ""}
+              ${item.savedToLibrary ? "" : `<button class="ghost-btn icon-btn" type="button" data-savelib="${item.id}" title="Save to your library" aria-label="Save to your library">💾</button>`}
+              <button class="remove-btn icon-btn" type="button" data-remove="${item.id}" title="Remove" aria-label="Remove">✕</button></div>
+          </div>
+          <textarea rows="4" data-edit="${item.id}" ${locked ? "readonly" : ""}>${escapeHtml(displayText(item))}</textarea>
+          ${edited ? `<div class="original-box">
+            <div class="original-label">Journal original</div>
+            <div class="original-text">${escapeHtml(item.originalBody)}</div>
+            ${locked ? "" : `<button type="button" class="revert-btn" data-revertcard="${item.id}">Revert to journal original</button>`}
+          </div>` : ""}
+        </article>`;
+      }).join("")}</div>
+    </details>`;
   }).join("");
   updateFoot();
 }
 
 function updateFoot() {
   const n = selected().length;
+  const preN = selected().filter((i) => L().preselected.includes(i.templateId)).length;
   el.footInfo.textContent =
-    (n ? `${n} request${n === 1 ? "" : "s"} · ${L().personalRequests.length} in your library` : "") +
+    (n ? `${preN} preselected, ${n - preN} manually added` : "") +
     (store.isOnline() ? "" : "  ·  offline (no server)");
   el.undoBtn.hidden = undoStack.length === 0;
   el.undoResetBtn.hidden = resetSnapshot === null;
@@ -2640,6 +2688,11 @@ function wire() {
     const item = selected().find((x) => x.id === cf.dataset.confirm);
     if (item) { item.customConfirmed = cf.checked; saveSession(); renderLetter(); }
   });
+  el.letterBody.addEventListener("toggle", (e) => {
+    const d = e.target.closest("details.letter-section");
+    if (!d) return;
+    letterSectionOpen.set(d.dataset.section, d.open);
+  }, true);
 
   el.lockToggle.addEventListener("change", () => {
     if (mode === "preview") state.settings.structuredLocked = el.lockToggle.checked;
@@ -2785,6 +2838,7 @@ function wire() {
     undoStack = [];
     expandedCardId = null;
     collapsedCards.clear();
+    letterSectionOpen.clear();
     applyDefaults();
     saveSession();
     render();
@@ -2848,6 +2902,7 @@ function wire() {
         undoStack = [];
         resetSnapshot = null;
         collapsedCards.clear();
+        letterSectionOpen.clear();
         saveSession(); saveWorking(); saveMasters(); saveSettings();
         el.manuscriptInput.value = state.session.manuscript || "";
         render();
