@@ -53,10 +53,16 @@
           Open working file
         </label>
         <button id="docxBtn" type="button" title="Export the letter as a Word .docx (table per section)">Export DOCX <span id="docxWarn" class="docx-warn" hidden title="Some requests needing customisation are not marked done">⚠</span></button>
-        <button id="setupBtn" type="button" title="Library Setup — build the shared foundation (system requests)" hidden>Setup</button>
         <button id="settingsBtn" type="button" title="Your personal layer — preselected, tags, adaptations">Settings</button>
-        <button id="roleBtn" type="button" title="Your role — declutters the interface, switch any time">👤 Choose role</button>
-        <button id="seedBtn" type="button" title="Reset selected requests to defaults">Reset</button>
+        <div class="menu-wrap">
+          <button id="menuBtn" class="icon-btn" type="button" title="More" aria-haspopup="true" aria-expanded="false">⋯</button>
+          <div id="topMenu" class="dropdown-menu" role="menu" hidden>
+            <button id="roleBtn" type="button" role="menuitem" title="Your role — declutters the interface, switch any time">👤 Choose role</button>
+            <button id="setupBtn" type="button" role="menuitem" title="Library Setup — build the shared foundation (system requests)" hidden>Setup</button>
+            <button id="seedBtn" type="button" role="menuitem" title="Reset selected requests to defaults">Reset</button>
+            <p class="dropdown-note">Data is saved in this browser — keep a library file as backup.</p>
+          </div>
+        </div>
       </div>
     </header>
 

@@ -212,7 +212,6 @@ function makeSelected(template) {
     groups: templateGroups(template.id),
     originalBody: template.body,
     customText: override ?? null,
-    useOriginal: false,
     custom: false,
     savedToLibrary: override != null,
     needsCustom: template.needsCustom || hasBrackets(override ?? template.body),
@@ -230,7 +229,6 @@ function makeSelectedFromLib(e) {
     groups: libGroups(e),
     originalBody: null,
     customText: e.body,
-    useOriginal: false,
     custom: true,
     savedToLibrary: true,
     needsCustom: hasBrackets(e.body),
@@ -240,7 +238,6 @@ function makeSelectedFromLib(e) {
 }
 const selected = () => state.session.selected;
 function displayText(item) {
-  if (item.useOriginal && item.originalBody != null) return item.originalBody;
   return item.customText != null ? item.customText : (item.originalBody || "");
 }
 function isEdited(item) {
@@ -304,7 +301,6 @@ function addCustom() {
     groups: [tab === "custom" ? "ea" : tab],
     originalBody: null,
     customText: text,
-    useOriginal: false,
     custom: true,
     savedToLibrary: false,
     needsCustom: hasBrackets(text),
@@ -338,8 +334,7 @@ function saveToLibrary(item) {
 function saveSelectedToLibrary(id) {
   const item = selected().find((x) => x.id === id);
   if (!item) return;
-  // Edited system request → save as an adaptation that replaces the original in the middle pane
-  // (the per-card "original" toggle still falls back to the system text).
+  // Edited system request → save as an adaptation that replaces the original in the middle pane.
   if (item.templateId && !item.custom) {
     L().adaptations[item.templateId] = displayText(item);
     item.savedToLibrary = true;
@@ -353,6 +348,17 @@ function saveSelectedToLibrary(id) {
   saveSession();
   render();
   flash("Saved to your library");
+}
+
+// Drop this card's edit and go back to showing the journal's original text (session-local — doesn't touch the library adaptation).
+function revertCardToOriginal(id) {
+  const item = selected().find((x) => x.id === id);
+  if (!item || item.originalBody == null) return;
+  item.customText = null;
+  item.savedToLibrary = false;
+  saveSession();
+  renderLetter();
+  flash("Reverted to journal original");
 }
 
 // Toggle which tabs a request shows in. Keeps at least one group so it stays reachable.
@@ -395,6 +401,10 @@ function applyRole() {
   const r = state.settings.role;
   el.roleBtn.textContent = "👤 " + (ROLE_LABELS[r] || "Choose role");
   el.setupBtn.hidden = !isDirector();
+}
+function closeTopMenu() {
+  el.topMenu.hidden = true;
+  el.menuBtn.setAttribute("aria-expanded", "false");
 }
 function openRolePicker() {
   el.roleCloseBtn.hidden = !state.settings.role;   // first run: a role must be picked
@@ -561,11 +571,15 @@ function renderLetter() {
           <div class="meta">${escapeHtml(section?.label || "Other")} · ${item.custom ? "custom" : "system"}${item.savedToLibrary ? " · saved" : ""}</div></div>
         <div class="card-actions">
           ${needsCustom ? `<label class="custom-confirm ${item.customConfirmed ? "done" : ""}" title="Tick once you have filled in this request"><input type="checkbox" data-confirm="${item.id}" ${item.customConfirmed ? "checked" : ""}> needs entry</label>` : ""}
-          ${edited ? `<label class="origtoggle"><input type="checkbox" data-orig="${item.id}" ${item.useOriginal ? "checked" : ""}> original</label>` : ""}
           ${item.savedToLibrary ? "" : `<button class="ghost-btn icon-btn" type="button" data-savelib="${item.id}" title="Save to your library" aria-label="Save to your library">💾</button>`}
           <button class="remove-btn icon-btn" type="button" data-remove="${item.id}" title="Remove" aria-label="Remove">✕</button></div>
       </div>
       <textarea rows="4" data-edit="${item.id}" ${locked ? "readonly" : ""}>${escapeHtml(displayText(item))}</textarea>
+      ${edited ? `<div class="original-box">
+        <div class="original-label">Journal original</div>
+        <div class="original-text">${escapeHtml(item.originalBody)}</div>
+        ${locked ? "" : `<button type="button" class="revert-btn" data-revertcard="${item.id}">Revert to journal original</button>`}
+      </div>` : ""}
     </article>`;
   }).join("");
   updateFoot();
@@ -584,11 +598,15 @@ function updateFoot() {
 }
 
 // ---- Settings overlay (personal layer) ----
-function settingsRow({ id, title, rawTitle, body, groups, fromLib, edited }) {
+function settingsRow({ id, title, rawTitle, body, groups, fromLib, edited, origBody }) {
   if (editingSettingId === id) {
     return `<div class="settings-row editing">
       <input class="settings-edit-title" type="text" data-edit-title="${id}" value="${escapeHtml(rawTitle ?? title)}" placeholder="Title">
       <textarea class="settings-edit" data-edit-id="${id}" rows="5">${escapeHtml(body)}</textarea>
+      ${!fromLib ? `<div class="original-box">
+        <div class="original-label">Journal original</div>
+        <div class="original-text">${escapeHtml(origBody)}</div>
+      </div>` : ""}
       <div class="settings-edit-actions">
         <button type="button" data-save="${id}">Save</button>
         ${!fromLib && edited ? `<button type="button" data-revert="${id}">Revert to system text</button>` : ""}
@@ -613,7 +631,7 @@ function renderSettings() {
     const items = templates.filter((t) => t.section === section.id && !isHidden(t.id));
     if (!items.length) return "";
     return `<div class="settings-group"><h4>${escapeHtml(section.label)}</h4>${
-      items.map((t) => settingsRow({ id: t.id, title: overrideTitle(t), rawTitle: overrideTitle(t), body: overrideBody(t), groups: templateGroups(t.id), fromLib: false, edited: isTplEdited(t.id) })).join("")
+      items.map((t) => settingsRow({ id: t.id, title: overrideTitle(t), rawTitle: overrideTitle(t), body: overrideBody(t), groups: templateGroups(t.id), fromLib: false, edited: isTplEdited(t.id), origBody: t.body })).join("")
     }</div>`;
   }).join("");
   if (L().personalRequests.length) {
@@ -1064,7 +1082,6 @@ function wire() {
     const item = selected().find((x) => x.id === ta.dataset.edit);
     if (!item) return;
     item.customText = ta.value;
-    item.useOriginal = false;
     item.savedToLibrary = false;
     saveSession();
     updateFoot();
@@ -1086,21 +1103,13 @@ function wire() {
     const rm = e.target.closest("button[data-remove]"); if (rm) return removeSelected(rm.dataset.remove);
     const mv = e.target.closest("button[data-move]"); if (mv) return move(mv.dataset.id, mv.dataset.move === "up" ? -1 : 1);
     const sv = e.target.closest("button[data-savelib]"); if (sv) return saveSelectedToLibrary(sv.dataset.savelib);
+    const rv = e.target.closest("button[data-revertcard]"); if (rv) return revertCardToOriginal(rv.dataset.revertcard);
   });
   el.letterBody.addEventListener("change", (e) => {
     const cf = e.target.closest("input[data-confirm]");
-    if (cf) {
-      const item = selected().find((x) => x.id === cf.dataset.confirm);
-      if (item) { item.customConfirmed = cf.checked; saveSession(); renderLetter(); }
-      return;
-    }
-    const orig = e.target.closest("input[data-orig]");
-    if (!orig) return;
-    const item = selected().find((x) => x.id === orig.dataset.orig);
-    if (!item) return;
-    item.useOriginal = orig.checked;
-    saveSession();
-    renderLetter();
+    if (!cf) return;
+    const item = selected().find((x) => x.id === cf.dataset.confirm);
+    if (item) { item.customConfirmed = cf.checked; saveSession(); renderLetter(); }
   });
 
   el.lockToggle.addEventListener("change", () => {
@@ -1123,6 +1132,18 @@ function wire() {
   $("#editModeBtn").addEventListener("click", () => setMode("edit"));
   $("#previewModeBtn").addEventListener("click", () => setMode("preview"));
   el.orderBtn.addEventListener("click", orderCards);
+
+  // "⋯" top-bar menu: Setup / Reset / role, closes on outside click, Escape, or picking an item.
+  el.menuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const open = el.topMenu.hidden;
+    el.topMenu.hidden = !open;
+    el.menuBtn.setAttribute("aria-expanded", String(open));
+  });
+  el.topMenu.addEventListener("click", (e) => { if (e.target.closest("button")) closeTopMenu(); });
+  document.addEventListener("click", (e) => {
+    if (!el.topMenu.hidden && !e.target.closest(".menu-wrap")) closeTopMenu();
+  });
 
   // Role picker — first-run overlay, reopened any time from the top bar.
   el.roleBtn.addEventListener("click", openRolePicker);
@@ -1323,6 +1344,7 @@ function wire() {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const inField = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
     if (e.key === "Escape") {
+      if (!el.topMenu.hidden) { closeTopMenu(); return; }
       if (!el.roleScreen.hidden) { if (state.settings.role) el.roleScreen.hidden = true; return; }   // first run: must pick
       if (!el.setupScreen.hidden) { el.setupScreen.hidden = true; return; }
       if (!el.settingsScreen.hidden) { el.settingsScreen.hidden = true; return; }
@@ -1357,6 +1379,7 @@ async function init() {
     lockLabel: $("#lockLabel"),
     footInfo: $("#footInfo"), undoBtn: $("#undoBtn"), undoResetBtn: $("#undoResetBtn"),
     orderBtn: $("#orderBtn"),
+    menuBtn: $("#menuBtn"), topMenu: $("#topMenu"),
     roleBtn: $("#roleBtn"), roleScreen: $("#roleScreen"), roleCloseBtn: $("#roleCloseBtn"), setupBtn: $("#setupBtn"),
     settingsScreen: $("#settingsScreen"), settingsList: $("#settingsList"),
     introText: $("#introText"), introRevertBtn: $("#introRevertBtn"),

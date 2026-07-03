@@ -82,6 +82,45 @@ h2 {
   gap: 8px;
 }
 
+.menu-wrap {
+  position: relative;
+}
+
+.dropdown-menu[hidden] { display: none; } /* author display:flex otherwise beats the hidden attr */
+
+.dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+}
+
+.dropdown-menu button {
+  border: 1px solid transparent;
+  text-align: left;
+}
+
+.dropdown-menu button:hover {
+  background: var(--soft-blue);
+}
+
+.dropdown-note {
+  margin: 4px 2px 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+
 #manuscriptInput {
   width: 260px;
   border: 1px solid var(--line);
@@ -482,13 +521,29 @@ h2 {
 
 .card-actions { display: flex; align-items: center; gap: 6px; }
 .ghost-btn { padding: 4px 7px; font-size: 12px; color: var(--blue); }
-.origtoggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--muted);
+
+.original-box {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  background: #fafbfc;
 }
+.original-label {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.original-text {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+.revert-btn { padding: 4px 8px; font-size: 12px; }
 
 .tag {
   display: inline-block;

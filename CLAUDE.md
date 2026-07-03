@@ -67,9 +67,9 @@ and all data stays on the user's computer.
 1. ✅ RS-tab → section; generic example seed; migrations.
 2. ✅ Role picker (Director/Editor/AE) replaces the Dev-password soft lock
    entirely; default tab + Setup visibility by role; Settings never locked.
-3. Top bar cleanup: Setup/Reset/role into a "⋯" menu; add "data is saved in
+3. ✅ Top bar cleanup: Setup/Reset/role into a "⋯" menu; add "data is saved in
    this browser — keep a library file as backup" note.
-4. Adaptation UX: editor shows journal original read-only + Revert inline.
+4. ✅ Adaptation UX: editor shows journal original read-only + Revert inline.
 5. Letter pane: cards grouped under collapsible section headers, collapsed
    by default except needs-entry.
 6. Split app.js into modules (state/checklist/letter/overlays/main);
